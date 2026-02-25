@@ -1,0 +1,39 @@
+{
+  "name": "shg-cli",
+  "version": "1.0.0",
+  "description": "⚡ A modern interactive CLI for Capacitor Android development",
+  "main": "dist/index.js",
+  "bin": {
+    "shg": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": ["dist", "README.md"],
+  "keywords": ["capacitor", "android", "cli", "ionic", "mobile", "shg"],
+  "author": "SHG",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Diplovee/shg-cli"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "chalk": "^5.3.0",
+    "execa": "^8.0.1",
+    "figlet": "^1.7.0"
+  },
+  "devDependencies": {
+    "@types/figlet": "^1.5.8",
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
