@@ -4,6 +4,7 @@ import * as p from "@clack/prompts";
 import chalk from "chalk";
 import figlet from "figlet";
 import { execa } from "execa";
+import { existsSync } from "node:fs";
 
 // ── ASCII Art Header ──────────────────────────────────────────────────────────
 const ascii = figlet.textSync("SHG", {
@@ -16,33 +17,62 @@ console.log(chalk.dim("  ⚡ Capacitor Android CLI — by SHG\n"));
 
 // ── Command Definitions ───────────────────────────────────────────────────────
 const COMMANDS = {
-  build:      { label: "npm run build",                              cmd: "npm", args: ["run", "build"] },
-  sync:       { label: "npx cap sync android",                       cmd: "npx", args: ["cap", "sync", "android"] },
-  run:        { label: "npx cap run android",                        cmd: "npx", args: ["cap", "run", "android"] },
-  install:    { label: "npm install @capacitor/core @capacitor/cli", cmd: "npm", args: ["install", "@capacitor/core", "@capacitor/cli"] },
-  init:       { label: "npx cap init",                               cmd: "npx", args: ["cap", "init"] },
-  update:     { label: "npx cap update",                             cmd: "npx", args: ["cap", "update"] },
-  addAndroid: { label: "npx cap add android",                        cmd: "npx", args: ["cap", "add", "android"] },
+  build:      { label: "npm run build",                              cmd: "npm", args: ["run", "build"], requiresCapProject: false },
+  sync:       { label: "npx cap sync android",                       cmd: "npx", args: ["cap", "sync", "android"], requiresCapProject: true },
+  run:        { label: "npx cap run android",                        cmd: "npx", args: ["cap", "run", "android"], requiresCapProject: true },
+  install:    { label: "npm install @capacitor/core @capacitor/cli", cmd: "npm", args: ["install", "@capacitor/core", "@capacitor/cli"], requiresCapProject: false },
+  init:       { label: "npx cap init",                               cmd: "npx", args: ["cap", "init"], requiresCapProject: false },
+  update:     { label: "npx cap update",                             cmd: "npx", args: ["cap", "update"], requiresCapProject: true },
+  addAndroid: { label: "npx cap add android",                        cmd: "npx", args: ["cap", "add", "android"], requiresCapProject: true },
 } as const;
 
 type CommandKey = keyof typeof COMMANDS;
 
+function isCapacitorProject(): boolean {
+  return (
+    existsSync("capacitor.config.ts") ||
+    existsSync("capacitor.config.js") ||
+    existsSync("capacitor.config.json")
+  );
+}
+
 // ── Run a command ─────────────────────────────────────────────────────────────
 async function runCommand(key: CommandKey) {
-  const { label, cmd, args } = COMMANDS[key];
+  const { label, cmd, args, requiresCapProject } = COMMANDS[key];
   const s = p.spinner();
+
+  if (requiresCapProject && !isCapacitorProject()) {
+    s.stop(
+      chalk.red(
+        "✘ No Capacitor project found. Run this from a project containing capacitor.config.ts/js/json.",
+      ),
+    );
+    process.exit(1);
+  }
+
   s.start(chalk.yellow(`Running: ${chalk.white(label)}`));
   try {
     await execa(cmd, args, { stdio: "inherit" });
     s.stop(chalk.green(`✔ Done: ${label}`));
-  } catch {
+  } catch (error) {
+    const details = error instanceof Error ? error.message : "Unknown command failure";
     s.stop(chalk.red(`✘ Failed: ${label}`));
+    console.error(chalk.red(`Reason: ${details}`));
     process.exit(1);
   }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error(
+      chalk.red(
+        "This CLI requires an interactive terminal (TTY). Run `shg` directly in your terminal.",
+      ),
+    );
+    process.exit(1);
+  }
+
   p.intro(chalk.bgCyan(chalk.black(" SHG CLI ")));
 
   const category = await p.select({

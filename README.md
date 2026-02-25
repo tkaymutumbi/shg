@@ -25,8 +25,8 @@ npx shg-cli
 
 ### Dev setup
 ```bash
-git clone https://github.com/Diplovee/shg-cli.git
-cd shg-cli
+git clone https://github.com/Diplovee/shg.git
+cd shg/shg-cli
 npm install
 npm run build
 npm link
@@ -37,6 +37,10 @@ npm link
 ```bash
 shg
 ```
+
+Requirements:
+- Run in an interactive terminal (TTY).
+- For `sync`, `run`, `update`, and `add android`, run from a Capacitor project root containing `capacitor.config.ts`, `capacitor.config.js`, or `capacitor.config.json`.
 
 ### 🚀 Build & Deploy
 | Option | Command |
@@ -80,6 +84,13 @@ shg-cli/
 npm login
 npm version patch
 npm publish --access public
+```
+
+## ✅ Quality Checks
+
+```bash
+npm run typecheck
+npm run smoke
 ```
 
 ## 👤 Author

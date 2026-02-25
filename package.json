@@ -8,6 +8,8 @@
   },
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "smoke": "npm run typecheck && npm run build",
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
@@ -18,7 +20,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Diplovee/shg-cli"
+    "url": "https://github.com/Diplovee/shg"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
