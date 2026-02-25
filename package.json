@@ -4,7 +4,7 @@
   "description": "⚡ A modern interactive CLI for Capacitor Android development",
   "main": "dist/index.js",
   "bin": {
-    "shg": "./dist/index.js"
+    "shg": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -30,7 +30,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Diplovee/shg"
+    "url": "git+https://github.com/Diplovee/shg.git"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
