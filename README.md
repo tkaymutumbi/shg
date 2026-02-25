@@ -32,6 +32,32 @@ npm run build
 npm link
 ```
 
+## 💻 Local Use (No Publish)
+
+Use this when you only want `shg` locally on your machine.
+
+```bash
+cd /home/diplov/shg/shg-cli
+npm install
+npm run build
+npm link
+shg
+```
+
+Rebuild after code changes:
+
+```bash
+cd /home/diplov/shg/shg-cli
+npm run build
+```
+
+Remove local global link:
+
+```bash
+cd /home/diplov/shg/shg-cli
+npm unlink -g shg-cli
+```
+
 ## 🛠 Usage
 
 ```bash
