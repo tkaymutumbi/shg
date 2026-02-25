@@ -1,6 +1,6 @@
 {
   "name": "shg-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "⚡ A modern interactive CLI for Capacitor Android development",
   "main": "dist/index.js",
   "bin": {
@@ -14,8 +14,18 @@
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
-  "files": ["dist", "README.md"],
-  "keywords": ["capacitor", "android", "cli", "ionic", "mobile", "shg"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "capacitor",
+    "android",
+    "cli",
+    "ionic",
+    "mobile",
+    "shg"
+  ],
   "author": "SHG",
   "license": "MIT",
   "repository": {
