@@ -6,14 +6,42 @@ import figlet from "figlet";
 import { execa } from "execa";
 import { existsSync } from "node:fs";
 
+const CLI_VERSION = "2026.1.0";
+
+function printVersionAndExitIfRequested() {
+  const args = new Set(process.argv.slice(2));
+  if (args.has("--version") || args.has("-v")) {
+    console.log(CLI_VERSION);
+    process.exit(0);
+  }
+}
+
+function printHelpAndExitIfRequested() {
+  const args = new Set(process.argv.slice(2));
+  if (args.has("--help") || args.has("-h")) {
+    console.log(`SHG CLI ${CLI_VERSION}
+
+Usage:
+  shg
+  shg --help
+  shg --version
+
+Flags:
+  -h, --help       Show this help output
+  -v, --version    Show CLI version
+
+Notes:
+  - Runs in interactive mode when no flags are provided.
+  - Requires a TTY for interactive usage.`);
+    process.exit(0);
+  }
+}
+
 // ── ASCII Art Header ──────────────────────────────────────────────────────────
 const ascii = figlet.textSync("SHG", {
   font: "ANSI Shadow",
   horizontalLayout: "fitted",
 });
-
-console.log("\n" + chalk.cyan(ascii));
-console.log(chalk.dim("  ⚡ Capacitor Android CLI — by SHG\n"));
 
 // ── Command Definitions ───────────────────────────────────────────────────────
 const COMMANDS = {
@@ -64,6 +92,9 @@ async function runCommand(key: CommandKey) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
+  printHelpAndExitIfRequested();
+  printVersionAndExitIfRequested();
+
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error(
       chalk.red(
@@ -72,6 +103,9 @@ async function main() {
     );
     process.exit(1);
   }
+
+  console.log("\n" + chalk.cyan(ascii));
+  console.log(chalk.dim("  ⚡ Capacitor Android CLI — by SHG\n"));
 
   p.intro(chalk.bgCyan(chalk.black(" SHG CLI ")));
 

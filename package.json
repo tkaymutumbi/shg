@@ -1,6 +1,6 @@
 {
   "name": "shg-cli",
-  "version": "1.0.1",
+  "version": "2026.1.0",
   "description": "⚡ A modern interactive CLI for Capacitor Android development",
   "main": "dist/index.js",
   "bin": {
@@ -16,7 +16,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "capacitor",
@@ -26,7 +27,7 @@
     "mobile",
     "shg"
   ],
-  "author": "SHG",
+  "author": "SHG (Sub-company of Xalo Software) - T-kay Tinotenda Mutumbiwenzou",
   "license": "MIT",
   "repository": {
     "type": "git",
