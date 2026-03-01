@@ -5,8 +5,11 @@ import chalk from "chalk";
 import figlet from "figlet";
 import { execa } from "execa";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 
-const CLI_VERSION = "2026.1.0";
+const require = createRequire(import.meta.url);
+const packageJson = require("../package.json") as { version?: string };
+const CLI_VERSION = packageJson.version ?? "0.0.0";
 
 function printVersionAndExitIfRequested() {
   const args = new Set(process.argv.slice(2));
@@ -105,9 +108,9 @@ async function main() {
   }
 
   console.log("\n" + chalk.cyan(ascii));
-  console.log(chalk.dim("  ⚡ Capacitor Android CLI — by SHG\n"));
+  console.log(chalk.dim(`  ⚡ Capacitor Android CLI — by SHG (v${CLI_VERSION})\n`));
 
-  p.intro(chalk.bgCyan(chalk.black(" SHG CLI ")));
+  p.intro(chalk.bgCyan(chalk.black(` SHG CLI v${CLI_VERSION} `)));
 
   const category = await p.select({
     message: "What do you want to do?",
