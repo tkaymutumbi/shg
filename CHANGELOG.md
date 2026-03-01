@@ -4,12 +4,22 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.3.0] - 2026-03-01
+
+### Added
+- New production bundle command: `shg bundle` with `--aab`, `--apk`, and `--both`.
+- Production artifact discovery and output reporting for generated `.aab` / `.apk` files.
+- Post-build navigation helpers that print artifact directory and copy-paste `cd` command.
+
+### Changed
+- Package version bumped to `2026.3.0`.
+
 ## [2026.2.0] - 2026-03-01
 
 ### Added
 - CLI version output via `shg --version` and `shg -v`.
 - CLI help output via `shg --help` and `shg -h`, including version and flag details.
-- Subcommand mode: `doctor`, `deploy`, `setup`, `run`, `devices`, `config`.
+- Subcommand mode: `doctor`, `deploy`, `setup`, `run`, `bundle`, `devices`, `config`.
 - `doctor` checks with optional safe auto-fix (`--fix`) and JSON output.
 - Config system with precedence: flags > local `.shgrc.json` > global config.
 - Runtime state persistence in `.shg/state.json` for last device/variant/flavor.
