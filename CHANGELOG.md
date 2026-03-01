@@ -4,7 +4,7 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
-## [2026.1.0] - 2026-03-01
+## [2026.2.0] - 2026-03-01
 
 ### Added
 - CLI version output via `shg --version` and `shg -v`.
@@ -18,6 +18,6 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Interactive mode refactored to use shared command handlers.
 
 ### Changed
-- Package version bumped to `2026.1.0`.
+- Package version bumped to `2026.2.0`.
 - Author metadata now lists SHG, developer T-kay Tinotenda Mutumbiwenzou, and SHG as a sub-company of Xalo Software.
 - CLI version now resolves from `package.json` so display stays in sync.
