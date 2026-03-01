@@ -1,69 +1,129 @@
-# ⚡ SHG CLI
+# SHG CLI
 
-> A modern interactive CLI tool for Capacitor Android development — so you never have to remember those commands again.
+Interactive and automation-first CLI for Capacitor Android workflows.
 
-```
-███████╗██╗  ██╗ ██████╗
-██╔════╝██║  ██║██╔════╝
-███████╗███████║██║  ███╗
-╚════██║██╔══██║██║   ██║
-███████║██║  ██║╚██████╔╝
-╚══════╝╚═╝  ╚═╝ ╚═════╝
-```
+## Install
 
-## 📦 Installation
-
-### Global install
 ```bash
 npm install -g shg-cli
 ```
 
-### Run instantly with npx
-```bash
-npx shg-cli
-```
-
-### Dev setup
-```bash
-git clone https://github.com/Diplovee/shg.git
-cd shg/shg-cli
-npm install
-npm run build
-npm link
-```
-
-Important:
-- Run all package commands from `shg-cli/` (not the repo root).
-
-## 💻 Local Use (No Publish)
-
-Use this when you only want `shg` locally on your machine.
+Local dev install:
 
 ```bash
 cd /home/diplov/shg/shg-cli
 npm install
 npm run build
 npm link
+```
+
+## Quick Usage
+
+Interactive mode:
+
+```bash
 shg
 ```
 
-Rebuild after code changes:
+Non-interactive mode:
 
 ```bash
-cd /home/diplov/shg/shg-cli
-npm run build
+shg doctor
+shg deploy --all
+shg setup --install --add-android
+shg run --device emulator-5554 --variant debug
+shg devices --json
 ```
 
-Remove local global link:
+Global flags:
 
 ```bash
-cd /home/diplov/shg/shg-cli
-npm unlink -g shg-cli
+shg --help
+shg --version
 ```
 
-## 🔄 Update Locally (after code changes)
+## Commands
 
-Use this each time you want to refresh your local CLI install:
+### `shg doctor [--fix] [--json] [--verbose]`
+Runs environment and project diagnostics.
+
+Checks include:
+- Node/npm
+- Java
+- adb
+- Android SDK env vars
+- Capacitor project detection
+- Android platform folder
+- Capacitor dependencies
+
+`--fix` policy:
+- Applies safe fixes only (for example dependency install)
+- Prints manual guidance for system-level fixes
+
+### `shg deploy [--all | --build | --sync | --run] [--device <id>] [--variant <name>] [--flavor <name>]`
+Smart deploy flow. `--all` runs build -> sync -> run.
+
+Behavior:
+- Auto-runs `doctor` before deploy when enabled in config
+- Stops on first failed step
+- Supports device/variant/flavor targeting for run step
+
+### `shg setup [--install] [--init] [--update] [--add-android]`
+Runs setup tasks in deterministic order:
+1. install
+2. init
+3. update
+4. add-android
+
+### `shg run [--device <id>] [--variant <name>] [--flavor <name>]`
+Runs `cap run android` with optional targeting and remembers last successful device/variant/flavor in `.shg/state.json`.
+
+### `shg devices [--json]`
+Lists devices from `adb devices -l`.
+
+### `shg config [list|get|set|path]`
+Reads and updates SHG config.
+
+Examples:
+
+```bash
+shg config list
+shg config get defaultVariant
+shg config set defaultVariant release
+shg config set output.verbose true --global
+shg config path
+shg config path --global
+```
+
+## Config
+
+Precedence order:
+1. CLI flags
+2. Local project config (`.shgrc.json`)
+3. Global config (`~/.config/shg/config.json` on Linux/macOS)
+4. Built-in defaults
+
+Example `.shgrc.json`:
+
+```json
+{
+  "defaultFlow": "deployAll",
+  "defaultDeviceId": "",
+  "defaultVariant": "debug",
+  "defaultFlavor": "",
+  "autoSyncBeforeRun": true,
+  "doctor": {
+    "autoRunBeforeDeploy": true,
+    "allowSafeFixes": false
+  },
+  "output": {
+    "verbose": false,
+    "json": false
+  }
+}
+```
+
+## Local Update / Retest
 
 ```bash
 cd /home/diplov/shg/shg-cli
@@ -71,24 +131,12 @@ npm install
 npm run build
 npm link
 hash -r
-```
-
-Verify:
-
-```bash
 which shg
 shg --version
 shg --help
 ```
 
-## 🧯 Troubleshooting
-
-`npm error Missing script: "build"`:
-- You are likely in the wrong directory.
-- Fix: `cd /home/diplov/shg/shg-cli`
-
-`npm error Cannot destructure property 'name' of '.for' as it is undefined.` during `npm link`:
-- Fallback install from the package folder:
+If `npm link` fails in your environment:
 
 ```bash
 cd /home/diplov/shg/shg-cli
@@ -96,88 +144,19 @@ npm install -g .
 hash -r
 ```
 
-If `shg` is still not found:
-- Restart terminal, or run `hash -r` again.
-
-## 🛠 Usage
-
-```bash
-shg
-```
-
-Check installed CLI version:
-
-```bash
-shg --version
-```
-
-Show help and flags:
-
-```bash
-shg --help
-```
-
-Requirements:
-- Run in an interactive terminal (TTY).
-- For `sync`, `run`, `update`, and `add android`, run from a Capacitor project root containing `capacitor.config.ts`, `capacitor.config.js`, or `capacitor.config.json`.
-
-### 🚀 Build & Deploy
-| Option | Command |
-|---|---|
-| Run ALL | `npm run build` → `npx cap sync android` → `npx cap run android` |
-| Build only | `npm run build` |
-| Sync only | `npx cap sync android` |
-| Run only | `npx cap run android` |
-
-### 🔧 Capacitor Setup
-| Option | Command |
-|---|---|
-| Install Capacitor | `npm install @capacitor/core @capacitor/cli` |
-| Init | `npx cap init` |
-| Update | `npx cap update` |
-| Add Android | `npx cap add android` |
-
-## 🧰 Tech Stack
-
-- [TypeScript](https://www.typescriptlang.org/)
-- [Clack Prompts](https://github.com/natemoo-re/clack)
-- [Chalk](https://github.com/chalk/chalk)
-- [Figlet](https://github.com/patorjk/figlet.js)
-- [Execa](https://github.com/sindresorhus/execa)
-
-## 📁 Project Structure
-
-```
-shg-cli/
-├── src/
-│   └── index.ts
-├── dist/
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## 🚢 Publishing
-
-```bash
-npm login
-npm version patch
-npm publish --access public
-```
-
-## ✅ Quality Checks
+## Quality Checks
 
 ```bash
 npm run typecheck
-npm run smoke
+npm run build
 ```
 
-## 📝 Changelog
+## Changelog
 
 Release notes are tracked in `CHANGELOG.md`.
 
-## 👤 Author
+## Author
 
-- Author: **SHG**
-- Developer: **T-kay Tinotenda Mutumbiwenzou**
-- Company context: **SHG** is a sub-company of **Xalo Software**.
+- Author: SHG
+- Developer: T-kay Tinotenda Mutumbiwenzou
+- Company context: SHG is a sub-company of Xalo Software.

@@ -1,165 +1,131 @@
 #!/usr/bin/env node
 
-import * as p from "@clack/prompts";
 import chalk from "chalk";
 import figlet from "figlet";
-import { execa } from "execa";
-import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
+import { runConfig } from "./commands/config.js";
+import { runDeploy } from "./commands/deploy.js";
+import { runDevices } from "./commands/devices.js";
+import { runDoctor } from "./commands/doctor.js";
+import { runRun } from "./commands/run.js";
+import { runSetup } from "./commands/setup.js";
+import type { CommandContext } from "./commands/types.js";
+import { parseArgs } from "./core/args.js";
+import { loadMergedConfig } from "./core/config.js";
+import { findProjectRoot } from "./core/project.js";
+import { CLI_VERSION } from "./core/version.js";
+import { runInteractive } from "./interactive.js";
 
-const require = createRequire(import.meta.url);
-const packageJson = require("../package.json") as { version?: string };
-const CLI_VERSION = packageJson.version ?? "0.0.0";
-
-function printVersionAndExitIfRequested() {
-  const args = new Set(process.argv.slice(2));
-  if (args.has("--version") || args.has("-v")) {
-    console.log(CLI_VERSION);
-    process.exit(0);
-  }
-}
-
-function printHelpAndExitIfRequested() {
-  const args = new Set(process.argv.slice(2));
-  if (args.has("--help") || args.has("-h")) {
-    console.log(`SHG CLI ${CLI_VERSION}
-
-Usage:
-  shg
-  shg --help
-  shg --version
-
-Flags:
-  -h, --help       Show this help output
-  -v, --version    Show CLI version
-
-Notes:
-  - Runs in interactive mode when no flags are provided.
-  - Requires a TTY for interactive usage.`);
-    process.exit(0);
-  }
-}
-
-// ── ASCII Art Header ──────────────────────────────────────────────────────────
 const ascii = figlet.textSync("SHG", {
   font: "ANSI Shadow",
   horizontalLayout: "fitted",
 });
 
-// ── Command Definitions ───────────────────────────────────────────────────────
-const COMMANDS = {
-  build:      { label: "npm run build",                              cmd: "npm", args: ["run", "build"], requiresCapProject: false },
-  sync:       { label: "npx cap sync android",                       cmd: "npx", args: ["cap", "sync", "android"], requiresCapProject: true },
-  run:        { label: "npx cap run android",                        cmd: "npx", args: ["cap", "run", "android"], requiresCapProject: true },
-  install:    { label: "npm install @capacitor/core @capacitor/cli", cmd: "npm", args: ["install", "@capacitor/core", "@capacitor/cli"], requiresCapProject: false },
-  init:       { label: "npx cap init",                               cmd: "npx", args: ["cap", "init"], requiresCapProject: false },
-  update:     { label: "npx cap update",                             cmd: "npx", args: ["cap", "update"], requiresCapProject: true },
-  addAndroid: { label: "npx cap add android",                        cmd: "npx", args: ["cap", "add", "android"], requiresCapProject: true },
-} as const;
-
-type CommandKey = keyof typeof COMMANDS;
-
-function isCapacitorProject(): boolean {
-  return (
-    existsSync("capacitor.config.ts") ||
-    existsSync("capacitor.config.js") ||
-    existsSync("capacitor.config.json")
-  );
-}
-
-// ── Run a command ─────────────────────────────────────────────────────────────
-async function runCommand(key: CommandKey) {
-  const { label, cmd, args, requiresCapProject } = COMMANDS[key];
-  const s = p.spinner();
-
-  if (requiresCapProject && !isCapacitorProject()) {
-    s.stop(
-      chalk.red(
-        "✘ No Capacitor project found. Run this from a project containing capacitor.config.ts/js/json.",
-      ),
-    );
-    process.exit(1);
-  }
-
-  s.start(chalk.yellow(`Running: ${chalk.white(label)}`));
-  try {
-    await execa(cmd, args, { stdio: "inherit" });
-    s.stop(chalk.green(`✔ Done: ${label}`));
-  } catch (error) {
-    const details = error instanceof Error ? error.message : "Unknown command failure";
-    s.stop(chalk.red(`✘ Failed: ${label}`));
-    console.error(chalk.red(`Reason: ${details}`));
-    process.exit(1);
-  }
-}
-
-// ── Main ──────────────────────────────────────────────────────────────────────
-async function main() {
-  printHelpAndExitIfRequested();
-  printVersionAndExitIfRequested();
-
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    console.error(
-      chalk.red(
-        "This CLI requires an interactive terminal (TTY). Run `shg` directly in your terminal.",
-      ),
-    );
-    process.exit(1);
-  }
-
+function printBanner(): void {
   console.log("\n" + chalk.cyan(ascii));
-  console.log(chalk.dim(`  ⚡ Capacitor Android CLI — by SHG (v${CLI_VERSION})\n`));
-
-  p.intro(chalk.bgCyan(chalk.black(` SHG CLI v${CLI_VERSION} `)));
-
-  const category = await p.select({
-    message: "What do you want to do?",
-    options: [
-      { value: "deploy", label: "🚀  Build & Deploy",  hint: "build → sync → run" },
-      { value: "setup",  label: "🔧  Capacitor Setup", hint: "install, init, update, add android" },
-    ],
-  });
-
-  if (p.isCancel(category)) { p.cancel("Cancelled."); process.exit(0); }
-
-  if (category === "deploy") {
-    const choice = await p.select({
-      message: "Pick a deploy command:",
-      options: [
-        { value: "all",   label: "⚡ Run ALL",              hint: "build → sync → run" },
-        { value: "build", label: "📦 npm run build" },
-        { value: "sync",  label: "🔄 npx cap sync android" },
-        { value: "run",   label: "▶️  npx cap run android" },
-      ],
-    });
-
-    if (p.isCancel(choice)) { p.cancel("Cancelled."); process.exit(0); }
-
-    if (choice === "all") {
-      await runCommand("build");
-      await runCommand("sync");
-      await runCommand("run");
-    } else {
-      await runCommand(choice as CommandKey);
-    }
-  }
-
-  if (category === "setup") {
-    const choice = await p.select({
-      message: "Pick a setup command:",
-      options: [
-        { value: "install",    label: "📥 Install Capacitor", hint: "@capacitor/core @capacitor/cli" },
-        { value: "init",       label: "🎬 Cap Init" },
-        { value: "update",     label: "⬆️  Cap Update" },
-        { value: "addAndroid", label: "🤖 Add Android Platform" },
-      ],
-    });
-
-    if (p.isCancel(choice)) { p.cancel("Cancelled."); process.exit(0); }
-    await runCommand(choice as CommandKey);
-  }
-
-  p.outro(chalk.cyan("✨ SHG done. Happy coding!"));
+  console.log(chalk.dim(`  Capacitor Android CLI - by SHG (v${CLI_VERSION})\n`));
 }
 
-main();
+function printHelp(): void {
+  console.log(`SHG CLI ${CLI_VERSION}
+
+Usage:
+  shg
+  shg <command> [flags]
+
+Commands:
+  doctor                  Run environment and project diagnostics
+  deploy                  Build/sync/run flows
+  setup                   Setup capacitor dependencies and platform
+  run                     Run Android app with optional targeting
+  devices                 List Android devices from adb
+  config                  Read or update SHG config
+
+Examples:
+  shg doctor --fix
+  shg deploy --all --device emulator-5554 --variant debug
+  shg setup --install --add-android
+  shg run --device emulator-5554
+  shg devices --json
+  shg config set defaultVariant release
+
+Global Flags:
+  -h, --help              Show help
+  -v, --version           Show version
+      --verbose           Verbose command output
+      --json              JSON output where supported
+`);
+}
+
+function makeContext(flags: Record<string, string | boolean>): CommandContext {
+  const projectRoot = findProjectRoot(process.cwd());
+  const loaded = loadMergedConfig(projectRoot);
+
+  return {
+    projectRoot,
+    config: {
+      ...loaded.config,
+      output: {
+        ...loaded.config.output,
+        verbose: Boolean(flags.verbose || loaded.config.output.verbose),
+        json: Boolean(flags.json || loaded.config.output.json),
+      },
+    },
+    verbose: Boolean(flags.verbose || loaded.config.output.verbose),
+    json: Boolean(flags.json || loaded.config.output.json),
+    flags,
+  };
+}
+
+async function main(): Promise<void> {
+  const parsed = parseArgs(process.argv.slice(2));
+
+  if (parsed.errors.length > 0) {
+    for (const error of parsed.errors) {
+      console.error(chalk.red(error));
+    }
+    printHelp();
+    process.exit(2);
+  }
+
+  if (parsed.version) {
+    console.log(CLI_VERSION);
+    process.exit(0);
+  }
+
+  if (parsed.help) {
+    printHelp();
+    process.exit(0);
+  }
+
+  const context = makeContext(parsed.flags);
+
+  if (!parsed.command) {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      console.error(chalk.red("Non-interactive terminal detected. Use a subcommand, e.g. `shg doctor`."));
+      process.exit(2);
+    }
+
+    printBanner();
+    const code = await runInteractive(context);
+    process.exit(code);
+  }
+
+  let exitCode = 0;
+  if (parsed.command === "doctor") {
+    exitCode = (await runDoctor(context)).exitCode;
+  } else if (parsed.command === "deploy") {
+    exitCode = (await runDeploy(context)).exitCode;
+  } else if (parsed.command === "setup") {
+    exitCode = (await runSetup(context)).exitCode;
+  } else if (parsed.command === "run") {
+    exitCode = (await runRun(context)).exitCode;
+  } else if (parsed.command === "devices") {
+    exitCode = (await runDevices(context)).exitCode;
+  } else if (parsed.command === "config") {
+    exitCode = (await runConfig(context, parsed.rest)).exitCode;
+  }
+
+  process.exit(exitCode);
+}
+
+void main();
