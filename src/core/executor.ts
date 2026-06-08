@@ -5,6 +5,7 @@ export interface CommandSpec {
   cmd: string;
   args: string[];
   cwd?: string;
+  env?: Record<string, string>;
 }
 
 export interface ExecutorOptions {
@@ -35,6 +36,7 @@ export async function runCommand(
       cwd: spec.cwd,
       stdio,
       reject: false,
+      env: spec.env,
     });
 
     return {

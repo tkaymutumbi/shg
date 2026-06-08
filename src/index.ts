@@ -24,6 +24,7 @@ import { findProjectRoot } from "./core/project.js";
 import { CLI_VERSION } from "./core/version.js";
 import { runInteractive } from "./interactive.js";
 import { ensureAgentDoc } from "./core/agent-doc.js";
+import { findAndroidSdkRoot } from "./core/project.js";
 
 const ascii = figlet.textSync("SHG", {
   font: "ANSI Shadow",
@@ -108,7 +109,17 @@ function makeContext(flags: Record<string, string | boolean>): CommandContext {
   };
 }
 
+function ensureAndroidSdkEnv(): void {
+  if (process.env.ANDROID_SDK_ROOT || process.env.ANDROID_HOME) return;
+  const found = findAndroidSdkRoot();
+  if (found) {
+    process.env.ANDROID_SDK_ROOT = found;
+    process.env.ANDROID_HOME = found;
+  }
+}
+
 async function main(): Promise<void> {
+  ensureAndroidSdkEnv();
   const parsed = parseArgs(process.argv.slice(2));
 
   if (parsed.errors.length > 0) {

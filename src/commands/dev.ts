@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { hasAndroidPlatform, readWebDir, webDirExists, hasValidAndroidSdk, findAndroidSdkRoot } from "../core/project.js";
+import { hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDev(context: CommandContext): Promise<CommandResult> {
@@ -17,6 +17,16 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   if (!hasAndroidPlatform(context.projectRoot)) {
     console.error(chalk.red("Android platform not found. Run `shg setup --add-android` first."));
     return { exitCode: 1 };
+  }
+
+  if (!hasValidAndroidSdk()) {
+    const found = findAndroidSdkRoot();
+    if (found) {
+      console.log(chalk.cyan(`Using Android SDK at ${found}`));
+    } else {
+      console.error(chalk.red("No valid Android SDK found. Install Android Studio and set ANDROID_SDK_ROOT."));
+      return { exitCode: 1 };
+    }
   }
 
   const webDir = readWebDir(context.projectRoot);
@@ -36,16 +46,6 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
         console.log(chalk.yellow(`Build failed. Creating empty "${webDir}" directory so Capacitor can still proceed...`));
         mkdirSync(webDirPath, { recursive: true });
       }
-    }
-  }
-
-  if (!hasValidAndroidSdk()) {
-    const found = findAndroidSdkRoot();
-    if (found) {
-      console.log(chalk.cyan(`Found Android SDK at ${found}. Set ANDROID_SDK_ROOT or ANDROID_HOME to this path.`));
-    } else {
-      console.error(chalk.red("No valid Android SDK found. Install Android Studio and set ANDROID_SDK_ROOT."));
-      return { exitCode: 1 };
     }
   }
 
