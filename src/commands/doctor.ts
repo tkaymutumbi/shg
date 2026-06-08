@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { hasAndroidPlatform } from "../core/project.js";
+import { hasAndroidPlatform, webDirExists, readWebDir, findAndroidSdkRoot } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 const MIN_GRADLE_VERSION = 8;
@@ -79,17 +79,24 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
   const sdkRoot = process.env.ANDROID_SDK_ROOT ?? process.env.ANDROID_HOME;
   let sdkStatus: DoctorCheck["status"] = "warn";
   let sdkDetails = sdkRoot ? sdkRoot : "ANDROID_SDK_ROOT/ANDROID_HOME not set";
+  let sdkFix = "Export ANDROID_SDK_ROOT pointing to a valid Android SDK installation.";
   if (sdkRoot) {
     const platformsDir = join(sdkRoot, "platforms");
     sdkStatus = existsSync(platformsDir) ? "pass" : "warn";
     sdkDetails = existsSync(platformsDir) ? sdkRoot : `${sdkRoot} (platforms/ missing)`;
+  } else {
+    const found = findAndroidSdkRoot();
+    if (found) {
+      sdkDetails = `Not set. Found SDK at: ${found}`;
+      sdkFix = `Run: export ANDROID_SDK_ROOT="${found}"`;
+    }
   }
   checks.push({
     id: "android-sdk",
     title: "Android SDK env",
     status: sdkStatus,
     details: sdkDetails,
-    fix: "Export ANDROID_SDK_ROOT pointing to a valid Android SDK installation.",
+    fix: sdkFix,
   });
 
   checks.push(await checkCommandVersion("gradle", ["--version"], "Gradle", "Install Gradle or use the Gradle wrapper."));
@@ -117,6 +124,16 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
       status: hasPlatform ? "pass" : "warn",
       details: hasPlatform ? "android/ exists" : "android/ missing",
       fix: "Run `shg setup --add-android`.",
+    });
+
+    const webDir = readWebDir(context.projectRoot);
+    const hasWebDir = webDirExists(context.projectRoot);
+    checks.push({
+      id: "web-assets",
+      title: "Web assets directory",
+      status: hasWebDir ? "pass" : "warn",
+      details: hasWebDir ? `${webDir}/ exists` : `${webDir}/ missing`,
+      fix: "Run `bun run build` or create the directory manually.",
     });
 
     const pkgPath = join(context.projectRoot, "package.json");
