@@ -235,6 +235,11 @@ export async function connectOverWifi(): Promise<boolean> {
       console.log(chalk.yellow(`  Could not reconnect to ${savedIp}:5555`));
     }
 
+    if (!savedIp) {
+      console.log(chalk.dim("  No saved WiFi device found. Enter your device IP to continue."));
+      console.log(chalk.dim("  It will be saved for next time."));
+    }
+
     const ip = await p.text({
       message: "Enter device IP address (shown in Settings → About phone → Status):",
       placeholder: savedIp ?? "192.168.1.22",
