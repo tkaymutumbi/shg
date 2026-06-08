@@ -210,17 +210,19 @@ The last successful device, variant, and flavor are saved to `.shg/state.json`.
 
 ### `shg build`
 
-Build a standalone APK/AAB via Gradle.
+Build a standalone APK/AAB. Automatically syncs web assets to the Android project before building (skip with `--no-sync`).
 
 | Flag | Description |
 |------|-------------|
 | `--release` | Build release variant |
 | `--variant <name>` | Build variant (default `debug`) |
 | `--flavor <name>` | Build flavor |
+| `--no-sync` | Skip web build and cap sync before Gradle |
 
 ```bash
 shg build
 shg build --release
+shg build --variant release --no-sync   # If you synced manually already
 ```
 
 ### `shg clean`
