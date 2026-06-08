@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, symlinkSync, chmodSync, unlinkSync, copyFileSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import { runCommand } from "./executor.js";
 import chalk from "chalk";
 
@@ -271,4 +271,16 @@ export async function connectOverWifi(): Promise<boolean> {
 
   console.log(chalk.green(`  Connected to ${ip}:5555 over WiFi\n`));
   return true;
+}
+
+export function getLanIp(): string {
+  const interfaces = networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] ?? []) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return "localhost";
 }

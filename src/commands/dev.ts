@@ -3,7 +3,7 @@ import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice } from "../core/project.js";
-import { ensureAdb, connectOverWifi } from "../core/android.js";
+import { ensureAdb, connectOverWifi, getLanIp } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDev(context: CommandContext): Promise<CommandResult> {
@@ -12,9 +12,9 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     return { exitCode: 1 };
   }
 
-  const host = typeof context.flags.host === "string" ? context.flags.host : "localhost";
-  const port = typeof context.flags.port === "string" ? context.flags.port : "5173";
   const wifi = Boolean(context.flags.wifi);
+  const host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? getLanIp() : "localhost");
+  const port = typeof context.flags.port === "string" ? context.flags.port : "5173";
 
   const adbOk = await ensureAdb();
   if (!adbOk) {
@@ -64,6 +64,7 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   if (wifi) {
     const wifiOk = await connectOverWifi();
     if (!wifiOk) return { exitCode: 1 };
+    console.log(chalk.cyan(`  Dev server will be accessible at http://${host}:${port} on your device\n`));
   }
 
   const deviceAvailable = await hasConnectedDevice();
