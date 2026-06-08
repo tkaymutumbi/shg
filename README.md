@@ -1,90 +1,299 @@
-# SHG CLI
-
-Interactive and automation-first CLI for Capacitor Android workflows.
-
-## Install
-
-```bash
-npm install -g shg-cli
+```
+███████╗██╗  ██╗ ██████╗ 
+██╔════╝██║  ██║██╔════╝ 
+███████╗███████║██║  ███╗
+╚════██║██╔══██║██║   ██║
+███████║██║  ██║╚██████╔╝
+╚══════╝╚═╝  ╚═╝ ╚═════╝ 
 ```
 
-Local dev install:
+<p align="center">
+  <strong>Interactive & automation-first CLI for Capacitor Android development</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Diplovee/shg/releases"><img src="https://img.shields.io/github/v/release/Diplovee/shg?style=flat&label=version" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Diplovee/shg?style=flat" alt="License"></a>
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.3%2B-%23ffffff?style=flat&logo=bun" alt="Bun"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-18%2B-339933?style=flat&logo=node.js" alt="Node"></a>
+  <a href="https://github.com/Diplovee/shg/issues"><img src="https://img.shields.io/github/issues-raw/Diplovee/shg?style=flat" alt="Issues"></a>
+  <a href="https://github.com/Diplovee/shg/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat" alt="PRs"></a>
+</p>
+
+---
+
+SHG streamlines every Capacitor Android workflow — from project setup and live-reload development to building signed APKs and bumping versions — so you spend less time on CLI incantations and more time building your app.
+
+## Features
+
+- **Interactive TUI** — Launch `shg` with no arguments to get a menu-driven interface
+- **Live Reload** — Start a dev server and Android app together with `shg dev`
+- **Smart Deploy** — Build → sync → run in one command with failure safety
+- **Project Setup** — Install Capacitor, init, update, and add the Android platform
+- **Build APK/AAB** — Debug or release builds via Gradle, no Android Studio needed
+- **Plugin Management** — Add, list, and sync Capacitor plugins
+- **Diagnostics** — Check Node, Java, adb, Android SDK, Gradle, and Capacitor deps
+- **Device Management** — List ADB devices with model info
+- **Logcat Viewer** — Tail filtered Android logs with `shg logs`
+- **Asset Generation** — Generate icons and splash screens via capacitor-assets
+- **Version Bumping** — Bump `versionName`/`versionCode` across configs and Gradle
+- **Upgrade Helper** — Check and upgrade Capacitor packages
+- **Clean Builds** — Remove build artifacts with one command
+- **Config System** — Global + per-project config with CLI flag overrides
+- **JSON Output** — Machine-readable output for CI integration
+
+## Installation
 
 ```bash
-cd /home/diplov/shg/shg-cli
-npm install
-npm run build
-npm link
+# Global install (recommended)
+bun install -g shg-cli
+
+# Or from source
+git clone https://github.com/Diplovee/shg.git
+cd shg
+bun install
+bun run build
+bun link
 ```
 
-## Quick Usage
+### Prerequisites
 
-Interactive mode:
+- [Bun](https://bun.sh) 1.3+ or [Node.js](https://nodejs.org) 18+
+- [Java JDK](https://adoptium.net) 17+ (for Android builds)
+- [Android SDK](https://developer.android.com/studio) with `ANDROID_HOME` or `ANDROID_SDK_ROOT` set
+- `adb` available on PATH
+
+## Quick Start
 
 ```bash
+# Launch the interactive menu
 shg
+
+# Or jump straight to a command
+shg doctor --fix
+shg setup --install --add-android
+shg dev --host 0.0.0.0
+shg deploy --all --device emulator-5554
 ```
 
-Non-interactive mode:
+## Interactive Mode
+
+Running `shg` with no arguments opens the interactive TUI:
+
+```
+┌─────────────────────────────────────────────┐
+│  SHG CLI Interactive                        │
+├─────────────────────────────────────────────┤
+│  What do you want to do?                    │
+│                                             │
+│  ○ Dev Server (Live Reload)                 │
+│  ○ Build & Deploy                           │
+│  ○ Capacitor Setup                          │
+│  ○ Build APK/AAB                            │
+│  ○ View Logs                                │
+│  ○ Plugin Manager                           │
+│  ○ Assets (Icons/Splash)                    │
+│  ○ Open in Android Studio                   │
+│  ○ Clean Project                            │
+│  ○ Check Upgrades                           │
+└─────────────────────────────────────────────┘
+```
+
+Each selection walks you through the necessary prompts — no flags to remember.
+
+## Command Reference
+
+### `shg dev`
+
+Start a live-reload dev server and launch the Android app.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host` | `localhost` | Dev server host |
+| `--port` | `5173` | Dev server port |
+
+```bash
+shg dev --host 0.0.0.0 --port 5173
+```
+
+### `shg doctor`
+
+Run environment and project diagnostics.
+
+| Flag | Description |
+|------|-------------|
+| `--fix` | Apply safe auto-fixes |
+| `--json` | JSON output |
+| `--verbose` | Verbose output |
 
 ```bash
 shg doctor
+shg doctor --fix
+shg doctor --json
+```
+
+### `shg deploy`
+
+Smart deploy pipeline: build → sync → run.
+
+| Flag | Description |
+|------|-------------|
+| `--all` | Full pipeline (default if no step selected) |
+| `--build` | Build only |
+| `--sync` | Sync only |
+| `--run` | Run only |
+| `--device <id>` | Target device |
+| `--variant <name>` | Build variant (e.g. `debug`, `release`) |
+| `--flavor <name>` | Build flavor |
+
+```bash
 shg deploy --all
+shg deploy --build --sync
+shg deploy --run --device emulator-5554 --variant release
+```
+
+### `shg setup`
+
+Install Capacitor, initialize, update, and add the Android platform.
+
+| Flag | Description |
+|------|-------------|
+| `--install` | Install `@capacitor/core` and `@capacitor/cli` |
+| `--init` | Run `cap init` |
+| `--update` | Run `cap update` |
+| `--add-android` | Add the Android platform |
+
+```bash
 shg setup --install --add-android
+shg setup --install --init --update --add-android
+```
+
+### `shg run`
+
+Run the Android app with targeting options.
+
+| Flag | Description |
+|------|-------------|
+| `--device <id>` | Target device |
+| `--variant <name>` | Build variant |
+| `--flavor <name>` | Build flavor |
+
+```bash
 shg run --device emulator-5554 --variant debug
+```
+
+The last successful device, variant, and flavor are saved to `.shg/state.json`.
+
+### `shg build`
+
+Build a standalone APK/AAB via Gradle.
+
+| Flag | Description |
+|------|-------------|
+| `--release` | Build release variant |
+| `--variant <name>` | Build variant (default `debug`) |
+| `--flavor <name>` | Build flavor |
+
+```bash
+shg build
+shg build --release
+```
+
+### `shg clean`
+
+Remove build artifacts and caches.
+
+```bash
+shg clean
+```
+
+### `shg devices`
+
+List connected Android devices from ADB.
+
+| Flag | Description |
+|------|-------------|
+| `--json` | JSON output |
+
+```bash
+shg devices
 shg devices --json
 ```
 
-Global flags:
+### `shg logs`
+
+Tail logcat with Capacitor filter.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tag` | `Capacitor` | Logcat tag filter |
+| `--level` | `D` | Log level (D, I, W, E) |
 
 ```bash
-shg --help
-shg --version
+shg logs
+shg logs --tag Capacitor --level E
 ```
 
-## Commands
+### `shg plugin`
 
-### `shg doctor [--fix] [--json] [--verbose]`
-Runs environment and project diagnostics.
+Manage Capacitor plugins.
 
-Checks include:
-- Node/npm
-- Java
-- adb
-- Android SDK env vars
-- Capacitor project detection
-- Android platform folder
-- Capacitor dependencies
+```bash
+shg plugin list
+shg plugin add @capacitor/camera
+shg plugin sync
+```
 
-`--fix` policy:
-- Applies safe fixes only (for example dependency install)
-- Prints manual guidance for system-level fixes
+### `shg assets`
 
-### `shg deploy [--all | --build | --sync | --run] [--device <id>] [--variant <name>] [--flavor <name>]`
-Smart deploy flow. `--all` runs build -> sync -> run.
+Generate app icons and splash screens via `capacitor-assets`.
 
-Behavior:
-- Auto-runs `doctor` before deploy when enabled in config
-- Stops on first failed step
-- Supports device/variant/flavor targeting for run step
+```bash
+shg assets
+```
 
-### `shg setup [--install] [--init] [--update] [--add-android]`
-Runs setup tasks in deterministic order:
-1. install
-2. init
-3. update
-4. add-android
+### `shg open`
 
-### `shg run [--device <id>] [--variant <name>] [--flavor <name>]`
-Runs `cap run android` with optional targeting and remembers last successful device/variant/flavor in `.shg/state.json`.
+Open the project in Android Studio.
 
-### `shg devices [--json]`
-Lists devices from `adb devices -l`.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--platform` | `android` | Platform to open |
 
-### `shg config [list|get|set|path]`
-Reads and updates SHG config.
+```bash
+shg open
+```
 
-Examples:
+### `shg bump`
+
+Bump `versionName` and `versionCode` in `capacitor.config.*` and `android/app/build.gradle`.
+
+| Flag | Description |
+|------|-------------|
+| `--to <version>` | Set specific version (e.g. `2026.5.0`) |
+| (none) | Auto-increment `versionCode` by 1 |
+
+```bash
+shg bump
+shg bump --to 2026.5.0
+```
+
+### `shg upgrade`
+
+Check and upgrade Capacitor packages.
+
+| Flag | Description |
+|------|-------------|
+| `--run` | Perform the upgrade |
+
+```bash
+shg upgrade
+shg upgrade --run
+```
+
+### `shg config`
+
+Read and update SHG configuration.
 
 ```bash
 shg config list
@@ -92,18 +301,18 @@ shg config get defaultVariant
 shg config set defaultVariant release
 shg config set output.verbose true --global
 shg config path
-shg config path --global
 ```
 
-## Config
+## Configuration
 
-Precedence order:
-1. CLI flags
-2. Local project config (`.shgrc.json`)
-3. Global config (`~/.config/shg/config.json` on Linux/macOS)
-4. Built-in defaults
+Configuration is resolved with the following precedence (highest wins):
 
-Example `.shgrc.json`:
+1. **CLI flags**
+2. **Local project config** — `.shgrc.json` in your project root
+3. **Global config** — `~/.config/shg/config.json` (Linux/macOS) or `%APPDATA%/shg/config.json` (Windows)
+4. **Built-in defaults**
+
+### Example `.shgrc.json`
 
 ```json
 {
@@ -123,40 +332,38 @@ Example `.shgrc.json`:
 }
 ```
 
-## Local Update / Retest
+### Global flags
+
+| Flag | Description |
+|------|-------------|
+| `-h, --help` | Show help |
+| `-v, --version` | Show version |
+| `--verbose` | Verbose command output |
+| `--json` | JSON output where supported |
+
+## Development
 
 ```bash
-cd /home/diplov/shg/shg-cli
-npm install
-npm run build
-npm link
-hash -r
-which shg
-shg --version
-shg --help
+git clone https://github.com/Diplovee/shg.git
+cd shg
+bun install
+bun run build
+bun link
 ```
 
-If `npm link` fails in your environment:
+### Scripts
 
-```bash
-cd /home/diplov/shg/shg-cli
-npm install -g .
-hash -r
-```
+| Script | Description |
+|--------|-------------|
+| `bun run build` | Compile TypeScript |
+| `bun run typecheck` | Type-check without emitting |
+| `bun run smoke` | Type-check + build |
+| `bun src/index.ts` | Run from source |
 
-## Quality Checks
+## Contributing
 
-```bash
-npm run typecheck
-npm run build
-```
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## Changelog
+## License
 
-Release notes are tracked in `CHANGELOG.md`.
-
-## Author
-
-- Author: SHG
-- Developer: T-kay Tinotenda Mutumbiwenzou
-- Company context: SHG is a sub-company of Xalo Software.
+[MIT](LICENSE) — SHG (Sub-company of Xalo Software) — T-kay Tinotenda Mutumbiwenzou

@@ -4,6 +4,31 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.4.0] - 2026-06-08
+
+### Added
+- **9 new commands**: `dev`, `logs`, `plugin`, `open`, `build`, `clean`, `assets`, `bump`, `upgrade`
+- **Interactive TUI** now includes all new commands with guided prompts
+- **Live reload development** (`shg dev`) launches dev server + Android app with `--livereload`
+- **Logcat viewer** (`shg logs`) with tag/level filtering
+- **Plugin manager** (`shg plugin add/list/sync`)
+- **Standalone build** (`shg build`) supports debug and release variants
+- **Version bump** (`shg bump`) syncs `versionName`/`versionCode` across config and Gradle
+- **Project cleaner** (`shg clean`) removes build artifacts
+- **Asset generator** (`shg assets`) wraps `capacitor-assets`
+- **Open in Android Studio** (`shg open`)
+- **Upgrade helper** (`shg upgrade`) checks and runs `cap upgrade`
+- **Doctor enhancements**: Gradle version check, Android SDK path validation
+- **Agent docs**: Auto-generates `.shg/AGENTS.md` when running inside a Capacitor project
+- **MIT LICENSE** file
+- **CONTRIBUTING.md** with development and release guidelines
+- **README** overhaul with ASCII art banner, badges, and full command reference
+
+### Changed
+- Migrated from npm to Bun (all commands now use `bun`, `bunx`, `bun add`, `bun pm ls`)
+- Switched lockfile from `package-lock.json` to `bun.lock`
+- Package version bumped to `2026.4.0`
+
 ## [2026.3.0] - 2026-03-01
 
 ### Added
