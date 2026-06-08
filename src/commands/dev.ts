@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot } from "../core/project.js";
+import { hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDev(context: CommandContext): Promise<CommandResult> {
@@ -15,16 +15,19 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   const port = typeof context.flags.port === "string" ? context.flags.port : "5173";
 
   if (!hasAndroidPlatform(context.projectRoot)) {
-    console.error(chalk.red("Android platform not found. Run `shg setup --add-android` first."));
+    console.error(chalk.red("Android platform not found."));
+    console.log(chalk.yellow("  Run: shg setup --add-android"));
     return { exitCode: 1 };
   }
 
-  if (!hasValidAndroidSdk()) {
+  const sdkRoot = process.env.ANDROID_SDK_ROOT ?? process.env.ANDROID_HOME;
+  if (!sdkRoot || !hasValidAndroidSdk()) {
     const found = findAndroidSdkRoot();
     if (found) {
-      console.log(chalk.cyan(`Using Android SDK at ${found}`));
+      console.log(chalk.cyan(`Android SDK detected at: ${found}`));
     } else {
-      console.error(chalk.red("No valid Android SDK found. Install Android Studio and set ANDROID_SDK_ROOT."));
+      console.error(chalk.red("No valid Android SDK found."));
+      console.log(chalk.yellow("  Install Android Studio, then set ANDROID_SDK_ROOT to your SDK path."));
       return { exitCode: 1 };
     }
   }
@@ -49,6 +52,14 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     }
   }
 
+  const deviceAvailable = await hasConnectedDevice();
+  if (!deviceAvailable) {
+    console.error(chalk.red("No Android device or emulator detected."));
+    console.log(chalk.yellow("  Connect a device via USB or start an emulator."));
+    console.log(chalk.yellow("  Check connected devices: adb devices -l"));
+    return { exitCode: 1 };
+  }
+
   console.log(chalk.cyan("\nStarting live reload dev server + Android app\n"));
 
   const capResult = await runCommand(
@@ -60,6 +71,14 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     },
     { verbose: context.verbose, stdio: "inherit" },
   );
+
+  if (!capResult.success) {
+    console.error(chalk.red("\nnative-run failed. Common causes:"));
+    console.log(chalk.yellow("  - No device or emulator connected (check: adb devices)"));
+    console.log(chalk.yellow("  - Android SDK not fully installed"));
+    console.log(chalk.yellow("  - App build/install error on device"));
+    console.log(chalk.dim("  Run: shg doctor --fix"));
+  }
 
   return { exitCode: capResult.success ? 0 : 1 };
 }

@@ -1,6 +1,8 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { dirname, join, resolve, sep } from "node:path";
 import { homedir } from "node:os";
+import { execaSync } from "execa";
+import { runCommand } from "./executor.js";
 
 const CONFIG_FILES = ["capacitor.config.ts", "capacitor.config.js", "capacitor.config.json"];
 
@@ -64,20 +66,89 @@ export function hasValidAndroidSdk(): boolean {
   return hasPlatform;
 }
 
+function which(cmd: string): string | undefined {
+  try {
+    const { stdout } = execaSync(
+      process.platform === "win32" ? "where" : "which",
+      [cmd],
+      { reject: false },
+    );
+    return stdout?.split(/\r?\n/)[0]?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveSdkFromBinary(binary: string, pathSuffix: string): string | undefined {
+  const binPath = which(binary);
+  if (!binPath) return undefined;
+
+  try {
+    let real = realpathSync(binPath);
+    const parts = real.split(sep);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const candidate = parts.slice(0, i).join(sep);
+      if (existsSync(join(candidate, pathSuffix))) {
+        return candidate;
+      }
+    }
+  } catch {}
+
+  return undefined;
+}
+
 export function findAndroidSdkRoot(): string | undefined {
   const env = process.env.ANDROID_SDK_ROOT ?? process.env.ANDROID_HOME;
   if (env && existsSync(join(env, "platforms"))) return env;
 
-  const candidates = [
-    join(homedir(), "Android", "Sdk"),
-    join(homedir(), "android", "sdk"),
+  const platform = process.platform;
+  const home = homedir();
+  const appData = process.env.LOCALAPPDATA ?? "";
+
+  const candidates: string[] = [];
+
+  if (platform === "darwin") {
+    candidates.push(join(home, "Library", "Android", "sdk"));
+  } else if (platform === "win32") {
+    candidates.push(join(appData, "Android", "Sdk"));
+    candidates.push(join(home, "AppData", "Local", "Android", "Sdk"));
+  }
+
+  candidates.push(
+    join(home, "Android", "Sdk"),
+    join(home, "android", "sdk"),
     "/usr/lib/android-sdk",
     "/opt/android-sdk",
-  ];
+    "/opt/android",
+    "/usr/local/share/android-sdk",
+  );
 
   for (const candidate of candidates) {
     if (existsSync(join(candidate, "platforms"))) return candidate;
   }
 
+  const fromSdkManager = resolveSdkFromBinary("sdkmanager", "platforms");
+  if (fromSdkManager) return fromSdkManager;
+
+  const fromAvdManager = resolveSdkFromBinary("avdmanager", "platforms");
+  if (fromAvdManager) return fromAvdManager;
+
+  const fromAdb = resolveSdkFromBinary("adb", "platforms");
+  if (fromAdb) return fromAdb;
+
   return undefined;
+}
+
+export async function hasConnectedDevice(): Promise<boolean> {
+  try {
+    const result = await runCommand(
+      { label: "adb devices", cmd: "adb", args: ["devices", "-l"] },
+      { stdio: "pipe" },
+    );
+    if (!result.success) return false;
+    const lines = result.stdout.split(/\r?\n/).filter((l) => l.trim() && !l.includes("List of"));
+    return lines.some((l) => /\bdevice\b/.test(l));
+  } catch {
+    return false;
+  }
 }
