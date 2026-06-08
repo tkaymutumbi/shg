@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, symlinkSync, chmodSync, unlinkSync, copyFileSync } from "node:fs";
+import * as p from "@clack/prompts";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { runCommand } from "./executor.js";
-import * as p from "@clack/prompts";
 import chalk from "chalk";
 
 export interface AndroidDevice {
@@ -198,15 +198,44 @@ export async function connectOverWifi(): Promise<boolean> {
 
   const devices = await listAndroidDevices();
   const usbDevices = devices.filter((d) => d.status === "device");
+  const wirelessDevices = devices.filter((d) => d.id.includes(":"));
+
+  if (wirelessDevices.length > 0) {
+    console.log(chalk.green(`  Already connected wirelessly: ${wirelessDevices[0].id}`));
+    return true;
+  }
 
   if (usbDevices.length === 0) {
-    console.error(chalk.red("  No USB-connected device found."));
-    console.log(chalk.yellow("  Connect your device via USB first, then retry."));
+    const ip = await p.text({
+      message: "Enter device IP address (shown in Settings → About phone → Status):",
+      placeholder: "192.168.1.22",
+      validate: (val?: string) => (val?.trim() ? undefined : "IP is required"),
+    }) as string | symbol;
+
+    if (typeof ip !== "string") {
+      console.log(chalk.yellow("  Cancelled."));
+      return false;
+    }
+
+    const connectResult = await runCommand(
+      { label: "adb connect", cmd: "adb", args: ["connect", `${ip.trim()}:5555`] },
+      { stdio: "pipe" },
+    );
+
+    if (connectResult.success) {
+      console.log(chalk.green(`  Connected to ${ip.trim()}:5555 over WiFi\n`));
+      return true;
+    }
+
+    console.error(chalk.red("  Connection failed. Make sure:"));  
+    console.log(chalk.yellow("  1. Device has Developer Options enabled"));
+    console.log(chalk.yellow("  2. USB Debugging is enabled"));
+    console.log(chalk.yellow("  3. Device has been authorized (USB connect once if first time)"));
+    console.log(chalk.yellow(`  4. Device IP is correct (${ip.trim()})`));
     return false;
   }
 
   const deviceId = usbDevices[0].id;
-
   console.log(chalk.dim(`  Device: ${deviceId}`));
 
   const ip = await getDeviceIp(deviceId);
