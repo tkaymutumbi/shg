@@ -5,6 +5,8 @@ import { runCommand } from "../core/executor.js";
 import { hasAndroidPlatform } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
+const MIN_GRADLE_VERSION = 8;
+
 interface DoctorCheck {
   id: string;
   title: string;
@@ -54,7 +56,7 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
   );
 
   checks.push(
-    await checkCommandVersion("npm", ["--version"], "npm", "Install npm and retry."),
+    await checkCommandVersion("bun", ["--version"], "bun", "Install bun and retry."),
   );
 
   checks.push(
@@ -75,13 +77,22 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
   checks.push(adbCheck);
 
   const sdkRoot = process.env.ANDROID_SDK_ROOT ?? process.env.ANDROID_HOME;
+  let sdkStatus: DoctorCheck["status"] = "warn";
+  let sdkDetails = sdkRoot ? sdkRoot : "ANDROID_SDK_ROOT/ANDROID_HOME not set";
+  if (sdkRoot) {
+    const platformsDir = join(sdkRoot, "platforms");
+    sdkStatus = existsSync(platformsDir) ? "pass" : "warn";
+    sdkDetails = existsSync(platformsDir) ? sdkRoot : `${sdkRoot} (platforms/ missing)`;
+  }
   checks.push({
     id: "android-sdk",
     title: "Android SDK env",
-    status: sdkRoot ? "pass" : "warn",
-    details: sdkRoot ? sdkRoot : "ANDROID_SDK_ROOT/ANDROID_HOME not set",
-    fix: "Export ANDROID_SDK_ROOT to your Android SDK path.",
+    status: sdkStatus,
+    details: sdkDetails,
+    fix: "Export ANDROID_SDK_ROOT pointing to a valid Android SDK installation.",
   });
+
+  checks.push(await checkCommandVersion("gradle", ["--version"], "Gradle", "Install Gradle or use the Gradle wrapper."));
 
   if (!context.projectRoot) {
     checks.push({
@@ -119,9 +130,9 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
       };
       const lsResult = await runCommand(
         {
-          label: "npm ls @capacitor/core @capacitor/cli",
-          cmd: "npm",
-          args: ["ls", "@capacitor/core", "@capacitor/cli", "--depth", "0"],
+          label: "bun pm ls",
+          cmd: "bun",
+          args: ["pm", "ls"],
           cwd: context.projectRoot,
         },
         { stdio: "pipe" },
@@ -136,9 +147,9 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
         installCheck.safeFix = async () => {
           await runCommand(
             {
-              label: "npm install @capacitor/core @capacitor/cli",
-              cmd: "npm",
-              args: ["install", "@capacitor/core", "@capacitor/cli"],
+              label: "bun add @capacitor/core @capacitor/cli",
+              cmd: "bun",
+              args: ["add", "@capacitor/core", "@capacitor/cli"],
               cwd: context.projectRoot,
             },
             { stdio: "inherit" },

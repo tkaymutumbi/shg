@@ -1,23 +1,47 @@
 import * as p from "@clack/prompts";
 import chalk from "chalk";
+import { runAssets } from "./commands/assets.js";
+import { runBuild } from "./commands/build.js";
+import { runClean } from "./commands/clean.js";
 import { runDeploy } from "./commands/deploy.js";
+import { runDev } from "./commands/dev.js";
+import { runLogs } from "./commands/logs.js";
+import { runOpen } from "./commands/open.js";
+import { runPlugin } from "./commands/plugin.js";
 import { runSetup } from "./commands/setup.js";
+import { runUpgrade } from "./commands/upgrade.js";
 import type { CommandContext } from "./commands/types.js";
+
+const CATEGORIES = [
+  { value: "dev", label: "Dev Server (Live Reload)", hint: "start dev server + android app" },
+  { value: "deploy", label: "Build & Deploy", hint: "smart deploy pipeline" },
+  { value: "setup", label: "Capacitor Setup", hint: "install/init/update/add android" },
+  { value: "build", label: "Build APK/AAB", hint: "standalone debug or release build" },
+  { value: "logs", label: "View Logs", hint: "tail logcat" },
+  { value: "plugin", label: "Plugin Manager", hint: "add/list/sync" },
+  { value: "assets", label: "Assets (Icons/Splash)", hint: "generate app assets" },
+  { value: "open", label: "Open in Android Studio", hint: "launch Android Studio" },
+  { value: "clean", label: "Clean Project", hint: "remove build artifacts" },
+  { value: "upgrade", label: "Check Upgrades", hint: "check/update Capacitor" },
+];
 
 export async function runInteractive(context: CommandContext): Promise<number> {
   p.intro(chalk.bgCyan(chalk.black(" SHG CLI Interactive ")));
 
   const category = await p.select({
     message: "What do you want to do?",
-    options: [
-      { value: "deploy", label: "Build & Deploy", hint: "smart deploy pipeline" },
-      { value: "setup", label: "Capacitor Setup", hint: "install/init/update/add android" },
-    ],
+    options: CATEGORIES,
   });
 
   if (p.isCancel(category)) {
     p.cancel("Cancelled.");
     return 130;
+  }
+
+  if (category === "dev") {
+    const result = await runDev(context);
+    p.outro(result.exitCode === 0 ? chalk.cyan("SHG done.") : chalk.red("SHG ended with errors."));
+    return result.exitCode;
   }
 
   if (category === "deploy") {
@@ -42,28 +66,159 @@ export async function runInteractive(context: CommandContext): Promise<number> {
     return result.exitCode;
   }
 
-  const choice = await p.multiselect({
-    message: "Pick setup steps:",
-    options: [
-      { value: "install", label: "Install Capacitor dependencies" },
-      { value: "init", label: "Capacitor init" },
-      { value: "update", label: "Capacitor update" },
-      { value: "add-android", label: "Add Android platform" },
-    ],
-    required: false,
-  });
+  if (category === "setup") {
+    const choice = await p.multiselect({
+      message: "Pick setup steps:",
+      options: [
+        { value: "install", label: "Install Capacitor dependencies" },
+        { value: "init", label: "Capacitor init" },
+        { value: "update", label: "Capacitor update" },
+        { value: "add-android", label: "Add Android platform" },
+      ],
+      required: false,
+    });
 
-  if (p.isCancel(choice)) {
-    p.cancel("Cancelled.");
-    return 130;
+    if (p.isCancel(choice)) {
+      p.cancel("Cancelled.");
+      return 130;
+    }
+
+    const flags: Record<string, string | boolean> = {};
+    for (const item of choice as string[]) {
+      flags[item] = true;
+    }
+    const result = await runSetup({ ...context, flags });
+    p.outro(result.exitCode === 0 ? chalk.cyan("SHG done.") : chalk.red("SHG ended with errors."));
+    return result.exitCode;
   }
 
-  const flags: Record<string, string | boolean> = {};
-  for (const item of choice as string[]) {
-    flags[item] = true;
+  if (category === "build") {
+    const variant = await p.select({
+      message: "Pick build variant:",
+      options: [
+        { value: "debug", label: "Debug" },
+        { value: "release", label: "Release" },
+      ],
+    });
+
+    if (p.isCancel(variant)) {
+      p.cancel("Cancelled.");
+      return 130;
+    }
+
+    const flags: Record<string, string | boolean> = variant === "release" ? { release: true } : {};
+    const result = await runBuild({ ...context, flags });
+    p.outro(result.exitCode === 0 ? chalk.cyan("Build complete.") : chalk.red("Build failed."));
+    return result.exitCode;
   }
 
-  const result = await runSetup({ ...context, flags });
-  p.outro(result.exitCode === 0 ? chalk.cyan("SHG done.") : chalk.red("SHG ended with errors."));
-  return result.exitCode;
+  if (category === "logs") {
+    const tag = await p.text({
+      message: "Logcat tag (default: Capacitor):",
+      placeholder: "Capacitor",
+    });
+
+    if (p.isCancel(tag)) {
+      p.cancel("Cancelled.");
+      return 130;
+    }
+
+    const level = await p.select({
+      message: "Log level:",
+      options: [
+        { value: "D", label: "Debug" },
+        { value: "I", label: "Info" },
+        { value: "W", label: "Warning" },
+        { value: "E", label: "Error" },
+      ],
+    });
+
+    if (p.isCancel(level)) {
+      p.cancel("Cancelled.");
+      return 130;
+    }
+
+    const flags: Record<string, string | boolean> = {};
+    if (tag && tag !== "Capacitor") flags.tag = tag;
+    flags.level = level as string;
+
+    const result = await runLogs({ ...context, flags });
+    p.outro(result.exitCode === 0 ? chalk.cyan("Logs done.") : chalk.red("Logs ended with errors."));
+    return result.exitCode;
+  }
+
+  if (category === "plugin") {
+    const action = await p.select({
+      message: "Plugin action:",
+      options: [
+        { value: "list", label: "List installed plugins" },
+        { value: "add", label: "Add a plugin" },
+        { value: "sync", label: "Sync plugins" },
+      ],
+    });
+
+    if (p.isCancel(action)) {
+      p.cancel("Cancelled.");
+      return 130;
+    }
+
+    let name: string | symbol | undefined;
+    if (action === "add") {
+      name = await p.text({
+        message: "Plugin package name:",
+        placeholder: "@capacitor/camera",
+      });
+
+      if (p.isCancel(name)) {
+        p.cancel("Cancelled.");
+        return 130;
+      }
+    }
+
+    const rest: string[] = [action as string];
+    if (name && typeof name === "string") rest.push(name);
+    const result = await runPlugin(context, rest);
+    p.outro(result.exitCode === 0 ? chalk.cyan("Plugin done.") : chalk.red("Plugin ended with errors."));
+    return result.exitCode;
+  }
+
+  if (category === "assets") {
+    const result = await runAssets(context);
+    p.outro(result.exitCode === 0 ? chalk.cyan("Assets generated.") : chalk.red("Assets failed."));
+    return result.exitCode;
+  }
+
+  if (category === "open") {
+    const result = await runOpen(context);
+    p.outro(result.exitCode === 0 ? chalk.cyan("Project opened.") : chalk.red("Failed to open project."));
+    return result.exitCode;
+  }
+
+  if (category === "clean") {
+    const result = await runClean(context);
+    p.outro(result.exitCode === 0 ? chalk.cyan("Project cleaned.") : chalk.red("Clean failed."));
+    return result.exitCode;
+  }
+
+  if (category === "upgrade") {
+    const shouldRun = await p.confirm({
+      message: "Run Capacitor upgrade?",
+      initialValue: false,
+    });
+
+    if (p.isCancel(shouldRun)) {
+      p.cancel("Cancelled.");
+      return 130;
+    }
+
+    const flags: Record<string, string | boolean> = {};
+    if (shouldRun) flags.run = true;
+
+    const result = await runUpgrade({ ...context, flags });
+    p.outro(result.exitCode === 0 ? chalk.cyan("Upgrade done.") : chalk.red("Upgrade failed."));
+    return result.exitCode;
+  }
+
+  p.cancel("Cancelled.");
+  return 130;
 }

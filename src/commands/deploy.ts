@@ -43,8 +43,8 @@ export async function runDeploy(context: CommandContext): Promise<CommandResult>
     if (step === "build") {
       const buildResult = await runCommand(
         {
-          label: "npm run build",
-          cmd: "npm",
+          label: "bun run build",
+          cmd: "bun",
           args: ["run", "build"],
           cwd: context.projectRoot,
         },
@@ -59,8 +59,8 @@ export async function runDeploy(context: CommandContext): Promise<CommandResult>
     if (step === "sync") {
       const syncResult = await runCommand(
         {
-          label: "npx cap sync android",
-          cmd: "npx",
+          label: "bunx cap sync android",
+          cmd: "bunx",
           args: ["cap", "sync", "android"],
           cwd: context.projectRoot,
         },

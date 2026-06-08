@@ -38,15 +38,15 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   const { device, variant, flavor } = resolveRunValues(context);
 
   if (!options.skipSync && context.config.autoSyncBeforeRun) {
-    const syncResult = await runCommand(
-      {
-        label: "npx cap sync android",
-        cmd: "npx",
-        args: ["cap", "sync", "android"],
-        cwd: context.projectRoot,
-      },
-      { verbose: context.verbose, stdio: "inherit" },
-    );
+      const syncResult = await runCommand(
+        {
+          label: "bunx cap sync android",
+          cmd: "bunx",
+          args: ["cap", "sync", "android"],
+          cwd: context.projectRoot,
+        },
+        { verbose: context.verbose, stdio: "inherit" },
+      );
 
     if (!syncResult.success) {
       return { exitCode: 1 };
@@ -66,8 +66,8 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
   const result = await runCommand(
     {
-      label: "npx cap run android",
-      cmd: "npx",
+      label: "bunx cap run android",
+      cmd: "bunx",
       args,
       cwd: context.projectRoot,
     },

@@ -13,25 +13,25 @@ const SETUP_STEPS: SetupStep[] = [
   {
     key: "install",
     label: "Install Capacitor",
-    cmd: "npm",
-    args: ["install", "@capacitor/core", "@capacitor/cli"],
+    cmd: "bun",
+    args: ["add", "@capacitor/core", "@capacitor/cli"],
   },
   {
     key: "init",
     label: "Capacitor Init",
-    cmd: "npx",
+    cmd: "bunx",
     args: ["cap", "init"],
   },
   {
     key: "update",
     label: "Capacitor Update",
-    cmd: "npx",
+    cmd: "bunx",
     args: ["cap", "update"],
   },
   {
     key: "add-android",
     label: "Add Android Platform",
-    cmd: "npx",
+    cmd: "bunx",
     args: ["cap", "add", "android"],
   },
 ];

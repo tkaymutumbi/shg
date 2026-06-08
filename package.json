@@ -1,18 +1,18 @@
 {
   "name": "shg-cli",
-  "version": "2026.3.0",
-  "description": "⚡ A modern interactive CLI for Capacitor Android development",
+  "version": "2026.4.0",
+  "description": "A modern interactive CLI for Capacitor Android development",
   "main": "dist/index.js",
   "bin": {
     "shg": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "smoke": "npm run typecheck && npm run build",
-    "dev": "ts-node src/index.ts",
-    "start": "node dist/index.js",
-    "prepublishOnly": "npm run build"
+    "build": "bun run tsc",
+    "typecheck": "bun run tsc --noEmit",
+    "smoke": "bun run typecheck && bun run build",
+    "dev": "bun src/index.ts",
+    "start": "bun dist/index.js",
+    "prepublishOnly": "bun run build"
   },
   "files": [
     "dist",
@@ -34,16 +34,15 @@
     "url": "git+https://github.com/Diplovee/shg.git"
   },
   "dependencies": {
-    "@clack/prompts": "^0.7.0",
-    "chalk": "^5.3.0",
-    "execa": "^8.0.1",
-    "figlet": "^1.7.0"
+    "@clack/prompts": "^1.5.1",
+    "chalk": "^5.4.1",
+    "execa": "^9.6.1",
+    "figlet": "^1.8.0"
   },
   "devDependencies": {
-    "@types/figlet": "^1.5.8",
-    "@types/node": "^20.0.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.0.0"
+    "@types/figlet": "^1.6.0",
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
   },
   "type": "module",
   "engines": {
