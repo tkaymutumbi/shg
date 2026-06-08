@@ -3,6 +3,7 @@ import * as p from "@clack/prompts";
 import { join } from "node:path";
 import { homedir, networkInterfaces } from "node:os";
 import { runCommand } from "./executor.js";
+import { readJsonFile, writeJsonFile } from "./fsjson.js";
 import chalk from "chalk";
 
 export interface AndroidDevice {
@@ -193,6 +194,19 @@ export async function getDeviceIp(deviceId?: string): Promise<string | undefined
   return ipMatch?.[1] ?? undefined;
 }
 
+function getWifiStatePath(): string {
+  return join(homedir(), ".shg", "wifi-state.json");
+}
+
+function loadWifiIp(): string | undefined {
+  const state = readJsonFile<{ lastIp: string }>(getWifiStatePath());
+  return state?.lastIp;
+}
+
+function saveWifiIp(ip: string): void {
+  writeJsonFile(getWifiStatePath(), { lastIp: ip });
+}
+
 export async function connectOverWifi(): Promise<boolean> {
   console.log(chalk.cyan("\nSetting up WiFi debugging...\n"));
 
@@ -206,9 +220,24 @@ export async function connectOverWifi(): Promise<boolean> {
   }
 
   if (usbDevices.length === 0) {
+    const savedIp = loadWifiIp();
+
+    if (savedIp) {
+      console.log(chalk.dim(`  Trying saved device IP: ${savedIp}`));
+      const retryResult = await runCommand(
+        { label: "adb connect", cmd: "adb", args: ["connect", `${savedIp}:5555`] },
+        { stdio: "pipe" },
+      );
+      if (retryResult.success) {
+        console.log(chalk.green(`  Reconnected to ${savedIp}:5555 over WiFi\n`));
+        return true;
+      }
+      console.log(chalk.yellow(`  Could not reconnect to ${savedIp}:5555`));
+    }
+
     const ip = await p.text({
       message: "Enter device IP address (shown in Settings → About phone → Status):",
-      placeholder: "192.168.1.22",
+      placeholder: savedIp ?? "192.168.1.22",
       validate: (val?: string) => (val?.trim() ? undefined : "IP is required"),
     }) as string | symbol;
 
@@ -223,6 +252,7 @@ export async function connectOverWifi(): Promise<boolean> {
     );
 
     if (connectResult.success) {
+      saveWifiIp(ip.trim());
       console.log(chalk.green(`  Connected to ${ip.trim()}:5555 over WiFi\n`));
       return true;
     }
@@ -269,6 +299,7 @@ export async function connectOverWifi(): Promise<boolean> {
     return false;
   }
 
+  saveWifiIp(ip);
   console.log(chalk.green(`  Connected to ${ip}:5555 over WiFi\n`));
   return true;
 }
