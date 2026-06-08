@@ -50,6 +50,7 @@ SHG reads config from (in order):
 \`\`\`bash
 # Live reload development
 shg dev --host 0.0.0.0 --port 5173
+shg dev --wifi                   # Wireless live reload
 
 # Full deploy pipeline
 shg deploy --all --device emulator-5554 --variant debug

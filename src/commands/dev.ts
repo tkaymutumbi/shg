@@ -3,6 +3,7 @@ import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice } from "../core/project.js";
+import { ensureAdb, connectOverWifi } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDev(context: CommandContext): Promise<CommandResult> {
@@ -13,6 +14,14 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
 
   const host = typeof context.flags.host === "string" ? context.flags.host : "localhost";
   const port = typeof context.flags.port === "string" ? context.flags.port : "5173";
+  const wifi = Boolean(context.flags.wifi);
+
+  const adbOk = await ensureAdb();
+  if (!adbOk) {
+    console.log(chalk.dim("  Install platform-tools and ensure `adb` is on PATH."));
+    console.log(chalk.dim("  https://developer.android.com/studio/releases/platform-tools"));
+    return { exitCode: 1 };
+  }
 
   if (!hasAndroidPlatform(context.projectRoot)) {
     console.error(chalk.red("Android platform not found."));
@@ -52,11 +61,18 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     }
   }
 
+  if (wifi) {
+    const wifiOk = await connectOverWifi();
+    if (!wifiOk) return { exitCode: 1 };
+  }
+
   const deviceAvailable = await hasConnectedDevice();
   if (!deviceAvailable) {
     console.error(chalk.red("No Android device or emulator detected."));
-    console.log(chalk.yellow("  Connect a device via USB or start an emulator."));
-    console.log(chalk.yellow("  Check connected devices: adb devices -l"));
+    console.log(chalk.yellow("  USB: Connect a device via USB."));
+    console.log(chalk.yellow("  WiFi: Re-run with --wifi flag (USB connect required first time)."));
+    console.log(chalk.yellow("  Emulator: Start an AVD from Android Studio."));
+    console.log(chalk.dim("  Check: adb devices -l"));
     return { exitCode: 1 };
   }
 

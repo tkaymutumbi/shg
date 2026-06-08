@@ -62,6 +62,7 @@ Commands:
 
 Examples:
   shg dev --host 0.0.0.0 --port 5173
+  shg dev --wifi                       Wireless live reload
   shg doctor --fix
   shg deploy --all --device emulator-5554 --variant debug
   shg setup --install --add-android
