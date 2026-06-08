@@ -28,6 +28,8 @@ SHG streamlines every Capacitor Android workflow — from project setup and live
 
 - **Interactive TUI** — Launch `shg` with no arguments to get a menu-driven interface
 - **Live Reload** — Start a dev server and Android app together with `shg dev`
+- **WiFi Debugging** — Run `shg dev --wifi` to deploy and hot-reload wirelessly
+- **Auto-Install adb** — Downloads platform-tools automatically if adb is missing
 - **Smart Deploy** — Build → sync → run in one command with failure safety
 - **Project Setup** — Install Capacitor, init, update, and add the Android platform
 - **Build APK/AAB** — Debug or release builds via Gradle, no Android Studio needed
@@ -72,7 +74,8 @@ shg
 # Or jump straight to a command
 shg doctor --fix
 shg setup --install --add-android
-shg dev --host 0.0.0.0
+shg dev --host 0.0.0.0              # Live reload over USB
+shg dev --wifi                       # Live reload over WiFi
 shg deploy --all --device emulator-5554
 ```
 
@@ -105,16 +108,37 @@ Each selection walks you through the necessary prompts — no flags to remember.
 
 ### `shg dev`
 
-Start a live-reload dev server and launch the Android app.
+Start a live-reload dev server and launch the Android app. Auto-installs `adb` if missing, auto-builds web assets if the output directory is empty, and detects the Android SDK even when `ANDROID_SDK_ROOT` isn't set.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--host` | `localhost` | Dev server host |
 | `--port` | `5173` | Dev server port |
+| `--wifi` | — | Connect to device over WiFi instead of USB |
+| `--skip-build` | — | Skip auto-build if web assets directory is missing |
+
+**First connection (USB required):**
+
+```bash
+# Connect device via USB, then run:
+shg dev
+```
+
+**After USB authorization (cable-free):**
+
+```bash
+shg dev --wifi
+```
+
+The device IP is auto-detected. If no device is found, you'll be prompted to enter the IP manually.
+
+**Custom dev server:**
 
 ```bash
 shg dev --host 0.0.0.0 --port 5173
 ```
+
+> Once running, the app hot-reloads on every file save — no need to re-run the command.
 
 ### `shg doctor`
 

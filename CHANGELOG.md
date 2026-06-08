@@ -29,6 +29,16 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 - Switched lockfile from `package-lock.json` to `bun.lock`
 - Package version bumped to `2026.4.0`
 
+### Fixed
+- Auto-detects Android SDK from common paths when `ANDROID_SDK_ROOT` unset
+- Falls back to locating SDK via `sdkmanager`, `avdmanager`, or `adb` on PATH
+- `shg dev` now checks web assets directory exists and auto-builds if missing
+- `shg dev` checks for connected device before launching, gives clear error
+- `shg dev --wifi` connects wirelessly (USB first time, then cable-free)
+- `shg dev` auto-installs platform-tools (adb) if not found on PATH
+- `shg doctor` reports web assets status and scans for SDK in common locations
+- Executor now supports custom environment variables for subprocesses
+
 ## [2026.3.0] - 2026-03-01
 
 ### Added
