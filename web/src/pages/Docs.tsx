@@ -301,9 +301,18 @@ const renderTextWithCode = (text: string) => {
   const parts = text.split(/(`[^`]+`)/g);
   return parts.map((part, index) => {
     if (part.startsWith('`') && part.endsWith('`')) {
+      const command = part.slice(1, -1);
       return (
-        <code key={index} className="bg-brand-accent/10 text-brand-accent px-1.5 py-0.5 rounded border border-brand-accent/20 font-mono text-sm mx-1">
-          {part.slice(1, -1)}
+        <code 
+          key={index} 
+          className="bg-brand-accent/10 text-brand-accent px-1.5 py-0.5 rounded border border-brand-accent/20 font-mono text-sm mx-1 cursor-pointer hover:bg-brand-accent/20 transition-colors"
+          onClick={() => {
+            navigator.clipboard.writeText(command);
+            alert(`Copied: ${command}`);
+          }}
+          title="Click to copy"
+        >
+          {command}
         </code>
       );
     }
