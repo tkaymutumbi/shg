@@ -57,9 +57,9 @@ const LandingPage = () => {
               <span className="hidden sm:inline">GitHub</span>
             </a>
             <ThemeSwitcher />
-            <a href="#install" className="bg-brand-accent hover:opacity-90 text-white px-4 py-2 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg shadow-brand-accent/20">
+            <Link to="/docs" className="bg-brand-accent hover:opacity-90 text-white px-4 py-2 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg shadow-brand-accent/20">
               Get Started
-            </a>
+            </Link>
           </div>
         </div>
       </nav>
