@@ -456,9 +456,8 @@ const renderTextWithCode = (text: string) => {
                     </p>
                   )}
 
-// Add this component outside the Docs function
-const CodeBlock: React.FC<{ content: string; language?: string; onCopy: (msg: string) => void }> = ({ content, language, onCopy }) => {
-  const [copied, setCopied] = React.useState(false);
+const CodeBlock = ({ content, language, onCopy }: { content: string; language?: string; onCopy: (msg: string) => void }) => {
+  const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
