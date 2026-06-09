@@ -321,7 +321,46 @@ const renderTextWithCode = (text: string) => {
           });
           };
 
-          const Docs = () => {
+          interface CodeBlockProps {
+  content: string;
+  language?: string;
+  onCopy: (msg: string) => void;
+}
+
+const CodeBlock = ({ content, language, onCopy }: CodeBlockProps) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    onCopy(`Copied to clipboard`);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="bg-dark-bg border border-border-subtle rounded-xl overflow-hidden shadow-2xl mb-6">
+      <div className="bg-dark-bg/50 px-4 py-2 flex items-center gap-2 border-b border-border-subtle">
+        <div className="w-2 h-2 rounded-full bg-brand-accent" />
+        <span className="text-[10px] opacity-40 font-bold uppercase tracking-widest text-dark-text">{language || 'shell'}</span>
+      </div>
+      <div className="p-6 font-mono text-sm group relative overflow-x-auto">
+        <pre className="text-dark-text">
+          {!content.startsWith('$') && !content.startsWith('{') && <span className="opacity-40 mr-3">$</span>}
+          {content}
+        </pre>
+        <button 
+          onClick={handleCopy}
+          className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-dark-bg/80 rounded"
+          title="Click to copy"
+        >
+          {copied ? <Check size={16} className="text-brand-accent" /> : <Copy size={16} className="opacity-40"/>}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const Docs = () => {
           const [activeCategory, setActiveCategory] = useState('cli');
           const [activeSection, setActiveSection] = useState('welcome');
           const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
