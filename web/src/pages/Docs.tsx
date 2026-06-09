@@ -456,7 +456,13 @@ const renderTextWithCode = (text: string) => {
                     </p>
                   )}
 
-const CodeBlock = ({ content, language, onCopy }: { content: string; language?: string; onCopy: (msg: string) => void }) => {
+interface CodeBlockProps {
+  content: string;
+  language?: string;
+  onCopy: (msg: string) => void;
+}
+
+const CodeBlock = ({ content, language, onCopy }: CodeBlockProps) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
