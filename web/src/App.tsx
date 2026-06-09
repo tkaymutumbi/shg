@@ -1,22 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, Terminal as TerminalIcon, Zap, Smartphone, Activity, ShieldCheck, Copy, Check, Code, Heart, Download, BookOpen } from 'lucide-react';
+import { ExternalLink, Terminal as TerminalIcon, Zap, Smartphone, Activity, ShieldCheck, Copy, Check, Code, Heart, Download, BookOpen, Sun, Moon } from 'lucide-react';
 import Logo from './components/Logo';
 import Terminal from './components/Terminal';
 import Docs from './pages/Docs';
 
+// Theme management utility
+const toggleTheme = () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('shg-theme', next);
+  return next;
+};
+
+const ThemeSwitcher = () => {
+  const [theme, setTheme] = useState(localStorage.getItem('shg-theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, []);
+
+  const handleToggle = () => {
+    const next = toggleTheme();
+    setTheme(next);
+  };
+
+  return (
+    <button 
+      onClick={handleToggle}
+      className="p-2 text-dark-text opacity-60 hover:opacity-100 transition-all hover:bg-brand-accent/10 rounded-lg"
+      aria-label="Toggle theme"
+    >
+      {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+    </button>
+  );
+};
+
 const LandingPage = () => {
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-brand-accent selection:text-white">
+    <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-brand-accent selection:text-white transition-colors duration-300">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-dark-bg/80 backdrop-blur-md border-b border-gray-800">
+      <nav className="sticky top-0 z-50 bg-nav-bg backdrop-blur-md border-b border-border-subtle">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Logo className="text-2xl" />
-            <span className="font-bold text-xl tracking-tight hidden sm:block">SHG CLI</span>
+            <Logo variant="header" className="text-xl" />
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             <Link to="/docs" className="hover:text-brand-accent transition-colors flex items-center gap-2">
               <BookOpen size={20} />
               <span className="hidden sm:inline">Docs</span>
@@ -25,7 +56,8 @@ const LandingPage = () => {
               <ExternalLink size={20} />
               <span className="hidden sm:inline">GitHub</span>
             </a>
-            <a href="#install" className="bg-brand-accent hover:bg-rose-500 text-white px-4 py-2 rounded-lg font-medium transition-all transform hover:scale-105">
+            <ThemeSwitcher />
+            <a href="#install" className="bg-brand-accent hover:opacity-90 text-white px-4 py-2 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg shadow-brand-accent/20">
               Get Started
             </a>
           </div>
@@ -43,7 +75,7 @@ const LandingPage = () => {
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 bg-gradient-to-r from-brand-primary to-brand-accent bg-clip-text text-transparent">
               Capacitor Android development,<br className="hidden md:block" /> simplified.
             </h1>
-            <p className="text-xl md:text-2xl text-gray-400 max-w-3xl mx-auto mb-10 leading-relaxed">
+            <p className="text-xl md:text-2xl opacity-60 max-w-3xl mx-auto mb-10 leading-relaxed">
               Interactive & automation-first CLI to streamline your mobile workflow from setup to deployment.
             </p>
           </motion.div>
@@ -59,7 +91,7 @@ const LandingPage = () => {
 
           <div id="install" className="max-w-xl mx-auto">
             <div className="bg-gray-900 border border-gray-700 rounded-xl p-1 flex items-center shadow-lg group">
-              <div className="flex-1 px-4 py-3 font-mono text-sm md:text-base text-gray-300 overflow-x-auto whitespace-nowrap">
+              <div className="flex-1 px-4 py-3 font-mono text-sm md:text-base text-gray-300 overflow-x-auto whitespace-nowrap text-left">
                 <span className="text-brand-accent">$</span> bun install -g shg-cli
               </div>
               <CopyButton code="bun install -g shg-cli" />
@@ -69,11 +101,11 @@ const LandingPage = () => {
       </header>
 
       {/* Features Grid */}
-      <section className="py-24 bg-[#0a0f1e]">
+      <section className="py-24 bg-dark-bg/50 border-y border-border-subtle">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Why use SHG?</h2>
-            <p className="text-gray-400 text-lg">Built for developers who value speed and reliability.</p>
+            <p className="opacity-60 text-lg">Built for developers who value speed and reliability.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -140,17 +172,17 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 border-t border-gray-800">
+      <footer className="py-12 border-t border-border-subtle">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <div className="flex justify-center mb-6">
-            <Logo className="text-xl" />
+            <Logo variant="header" className="text-xl" />
           </div>
-          <p className="text-gray-500 mb-4 flex items-center justify-center gap-2">
+          <p className="opacity-50 mb-4 flex items-center justify-center gap-2">
             Built with <Heart size={16} className="text-brand-accent fill-brand-accent" /> for the Capacitor community.
           </p>
-          <div className="flex justify-center gap-6 text-sm text-gray-400">
-            <a href="https://github.com/Diplovee/shg/blob/main/LICENSE" className="hover:text-white transition-colors">MIT License</a>
-            <a href="https://github.com/Diplovee/shg/blob/main/CONTRIBUTING.md" className="hover:text-white transition-colors">Contributing</a>
+          <div className="flex justify-center gap-6 text-sm opacity-60">
+            <a href="https://github.com/Diplovee/shg/blob/main/LICENSE" className="hover:text-brand-accent transition-colors">MIT License</a>
+            <a href="https://github.com/Diplovee/shg/blob/main/CONTRIBUTING.md" className="hover:text-brand-accent transition-colors">Contributing</a>
             <span>© 2026 SHG CLI</span>
           </div>
         </div>
@@ -173,19 +205,19 @@ const App: React.FC = () => {
 const FeatureCard: React.FC<{ icon: React.ReactNode; title: string; description: string }> = ({ icon, title, description }) => (
   <motion.div 
     whileHover={{ y: -5 }}
-    className="bg-gray-900/50 border border-gray-800 p-8 rounded-2xl hover:border-brand-accent/50 transition-all group"
+    className="bg-dark-bg border border-border-subtle p-8 rounded-2xl hover:border-brand-accent/50 transition-all group"
   >
     <div className="bg-brand-accent/10 w-12 h-12 rounded-lg flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
       {icon}
     </div>
     <h3 className="text-xl font-bold mb-3">{title}</h3>
-    <p className="text-gray-400 leading-relaxed">{description}</p>
+    <p className="opacity-60 leading-relaxed">{description}</p>
   </motion.div>
 );
 
 const CodeBlock: React.FC<{ label: string; code: string }> = ({ label, code }) => (
-  <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-sm">
-    <div className="px-4 py-2 border-b border-gray-800 text-xs font-medium text-gray-500 bg-gray-900/50 uppercase tracking-wider">
+  <div className="bg-dark-bg border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+    <div className="px-4 py-2 border-b border-border-subtle text-xs font-medium opacity-50 bg-dark-bg/50 uppercase tracking-wider text-left">
       {label}
     </div>
     <div className="p-4 font-mono text-brand-primary flex items-center justify-between">
@@ -208,7 +240,7 @@ const CopyButton: React.FC<{ code: string; variant?: 'default' | 'ghost' }> = ({
     return (
       <button 
         onClick={handleCopy}
-        className="text-gray-600 hover:text-brand-accent transition-all relative"
+        className="opacity-60 hover:text-brand-accent transition-all relative"
       >
         <AnimatePresence mode="wait">
           {copied ? (
@@ -269,4 +301,5 @@ const CopyButton: React.FC<{ code: string; variant?: 'default' | 'ghost' }> = ({
   );
 };
 
+export { ThemeSwitcher };
 export default App;

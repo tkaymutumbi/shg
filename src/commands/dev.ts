@@ -137,7 +137,7 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     {
       label: "bunx cap run android --livereload",
       cmd: "bunx",
-      args: ["cap", "run", "android", "--livereload", `--host=${host}`, `--port=${port}`],
+      args: ["cap", "run", "android", "--live-reload", `--host=${host}`, `--port=${port}`],
       cwd: context.projectRoot,
     },
     { verbose: context.verbose, stdio: "inherit" },

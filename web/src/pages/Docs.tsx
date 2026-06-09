@@ -1,166 +1,243 @@
-import React from 'react';
-import { Zap, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Search, 
+  Terminal, 
+  Box, 
+  Layout, 
+  TestTube, 
+  BookOpen, 
+  Newspaper, 
+  MessageSquare, 
+  Download, 
+  ChevronRight,
+  Menu as MenuIcon,
+  X,
+  Copy,
+  Lightbulb,
+  ExternalLink,
+  ChevronDown
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ThemeSwitcher } from '../App';
+import Logo from '../components/Logo';
 
 const Docs = () => {
-  const [activeSection, setActiveSection] = React.useState('introduction');
+  const [activeSection, setActiveSection] = useState('installation');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const sections = [
-    { id: 'introduction', label: 'Introduction' },
-    { id: 'installation', label: 'Installation' },
-    { id: 'quick-start', label: 'Quick Start' },
-    { id: 'commands', label: 'Commands' },
-    { id: 'configuration', label: 'Configuration' },
+  const navigation = [
+    {
+      title: 'Get Started',
+      items: [
+        { id: 'welcome', label: 'Welcome to SHG' },
+        { id: 'installation', label: 'Installation' },
+        { id: 'quickstart', label: 'Quickstart' },
+      ]
+    },
+    {
+      title: 'Commands',
+      items: [
+        { id: 'shg-dev', label: 'shg dev' },
+        { id: 'shg-deploy', label: 'shg deploy' },
+        { id: 'shg-doctor', label: 'shg doctor' },
+        { id: 'shg-setup', label: 'shg setup' },
+      ]
+    },
+    {
+      title: 'Advanced',
+      items: [
+        { id: 'configuration', label: 'shgrc.json' },
+        { id: 'wifi-debugging', label: 'WiFi Debugging' },
+        { id: 'asset-generation', label: 'Asset Generation' },
+      ]
+    }
   ];
 
   return (
-    <div className="min-h-screen bg-dark-bg text-dark-text flex flex-col md:flex-row">
-      {/* Documentation Sidebar */}
-      <aside className="w-full md:w-64 bg-gray-950 border-r border-gray-800 p-6 md:sticky md:top-0 md:h-screen overflow-y-auto">
-        <div className="mb-8 flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-accent rounded flex items-center justify-center font-bold text-white">S</div>
-          <span className="font-bold text-lg">Docs</span>
-        </div>
-        
-        <nav className="space-y-1">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => {
-                setActiveSection(section.id);
-                const element = document.getElementById(section.id);
-                if (element) element.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeSection === section.id 
-                  ? 'bg-brand-accent/10 text-brand-accent' 
-                  : 'text-gray-400 hover:text-white hover:bg-gray-900'
-              }`}
-            >
-              {section.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 p-8 md:p-16 max-w-4xl mx-auto">
-        <section id="introduction" className="mb-16">
-          <h1 className="text-4xl font-bold mb-6">Introduction</h1>
-          <p className="text-lg text-gray-400 leading-relaxed mb-6">
-            SHG is an interactive, automation-first CLI designed to simplify Capacitor Android development. 
-            It streamlines everything from project setup to deployment, so you can focus on building your app.
-          </p>
-          <div className="bg-blue-900/20 border border-blue-800 p-4 rounded-xl flex gap-4">
-            <Zap className="text-blue-400 shrink-0" size={24} />
-            <p className="text-blue-100 text-sm">
-              SHG is built to be fast, reliable, and user-friendly. No more memorizing long lists of flags.
-            </p>
-          </div>
-        </section>
-
-        <section id="installation" className="mb-16">
-          <h2 className="text-3xl font-bold mb-6">Installation</h2>
-          <p className="text-gray-400 mb-4">The easiest way to install SHG CLI is via Bun (recommended):</p>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 font-mono text-brand-primary mb-8 relative group">
-            <code>bun install -g shg-cli</code>
-          </div>
+    <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-brand-accent/30 transition-colors duration-300">
+      {/* Top Navbar */}
+      <nav className="h-14 border-b border-border-subtle bg-nav-bg backdrop-blur-md sticky top-0 z-50 px-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-2">
+            <Logo variant="header" className="text-lg" />
+          </Link>
           
-          <h3 className="text-xl font-bold mb-4">Prerequisites</h3>
-          <ul className="list-disc list-inside space-y-2 text-gray-400">
-            <li>Bun 1.3+ or Node.js 18+</li>
-            <li>Java JDK 17+ (for Android builds)</li>
-            <li>Android SDK with ANDROID_HOME set</li>
-            <li>adb available on PATH</li>
-          </ul>
-        </section>
+          <div className="hidden lg:flex items-center gap-1 text-sm font-medium opacity-60">
+            <NavTab icon={<Terminal size={16}/>} label="CLI" active />
+            <NavTab icon={<Box size={16}/>} label="Core" />
+            <NavTab icon={<Layout size={16}/>} label="Plugins" />
+            <NavTab icon={<TestTube size={16}/>} label="Tests" />
+          </div>
+        </div>
 
-        <section id="quick-start" className="mb-16">
-          <h2 className="text-3xl font-bold mb-6">Quick Start</h2>
-          <p className="text-gray-400 mb-6">Get up and running in seconds with these core commands:</p>
-          <div className="space-y-4">
-            <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-              <div className="text-xs text-gray-500 uppercase mb-2">Check environment</div>
-              <code className="text-brand-accent">shg doctor --fix</code>
+        <div className="flex-1 max-w-md hidden md:flex relative group">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40">
+            <Search size={16} />
+          </div>
+          <input 
+            type="text" 
+            placeholder="Search..." 
+            className="w-full bg-dark-bg/50 border border-border-subtle rounded-md py-1.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand-accent transition-colors"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] bg-dark-bg px-1.5 py-0.5 rounded opacity-40 border border-border-subtle">
+            Ctrl K
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-4 mr-4 opacity-60 text-sm">
+            <span className="hover:text-brand-accent cursor-pointer"><BookOpen size={18}/></span>
+            <span className="hover:text-brand-accent cursor-pointer"><Newspaper size={18}/></span>
+            <span className="hover:text-brand-accent cursor-pointer"><MessageSquare size={18}/></span>
+          </div>
+          <button className="hidden md:flex items-center gap-2 bg-brand-accent text-white px-3 py-1.5 rounded-md text-sm font-bold hover:opacity-90 transition-colors shadow-lg shadow-brand-accent/20">
+            <Download size={16} />
+            Install SHG
+          </button>
+          <ThemeSwitcher />
+          <button 
+            className="lg:hidden p-2 opacity-60"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X size={20}/> : <MenuIcon size={20}/>}
+          </button>
+        </div>
+      </nav>
+
+      <div className="max-w-[1440px] mx-auto flex">
+        {/* Left Sidebar */}
+        <aside className={`
+          fixed inset-0 top-14 z-40 lg:static lg:block w-64 border-r border-border-subtle bg-dark-bg overflow-y-auto h-[calc(100vh-3.5rem)]
+          ${isMobileMenuOpen ? 'block' : 'hidden'}
+        `}>
+          <div className="p-6 space-y-8 text-left">
+            {navigation.map((group) => (
+              <div key={group.title}>
+                <h4 className="text-xs font-bold opacity-40 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <ChevronRight size={12}/> {group.title}
+                </h4>
+                <div className="space-y-1">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveSection(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`
+                        w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors
+                        ${activeSection === item.id 
+                          ? 'bg-brand-accent/10 text-brand-accent font-medium border border-brand-accent/20' 
+                          : 'opacity-60 hover:opacity-100 hover:bg-dark-bg/50'}
+                      `}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {/* Central Content */}
+        <main className="flex-1 min-w-0 p-8 lg:p-12 overflow-y-auto h-[calc(100vh-3.5rem)] scroll-smooth text-left">
+          <div className="max-w-3xl">
+            <header className="mb-12">
+              <div className="text-brand-accent text-sm font-bold mb-4 uppercase tracking-wider">Get Started</div>
+              <h1 className="text-5xl font-black mb-6 tracking-tight">Installation</h1>
+              <p className="text-xl opacity-60 leading-relaxed">
+                Install SHG with bun, npm, or directly from source.
+              </p>
+              
+              <div className="mt-8 flex items-center gap-2">
+                <button className="bg-dark-bg/50 border border-border-subtle hover:border-brand-accent/50 px-3 py-1.5 rounded flex items-center gap-2 text-sm">
+                  <Copy size={14}/> Copy page
+                </button>
+                <button className="bg-dark-bg/50 border border-border-subtle hover:border-brand-accent/50 px-2 py-1.5 rounded">
+                  <ChevronDown size={14}/>
+                </button>
+              </div>
+            </header>
+
+            <div className="space-y-12">
+              <section id="overview">
+                <h2 className="text-3xl font-bold mb-6 tracking-tight">Overview</h2>
+                <p className="opacity-70 leading-7 mb-6 text-lg">
+                  SHG ships as a lightweight CLI tool to automate your Capacitor Android workflows. 
+                  It handles everything from environment checks to wireless debugging.
+                </p>
+                
+                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex gap-4 text-green-500">
+                  <Lightbulb className="shrink-0 mt-1" size={20} />
+                  <p className="text-sm leading-6">
+                    After installation, verify with <code className="bg-green-500/20 px-1.5 py-0.5 rounded border border-green-500/30 mx-1 font-mono">shg --version</code> and <code className="bg-green-500/20 px-1.5 py-0.5 rounded border border-green-500/30 mx-1 font-mono">shg doctor</code>.
+                  </p>
+                </div>
+              </section>
+
+              <section id="installation-actual">
+                <h2 className="text-3xl font-bold mb-6 tracking-tight">Installation</h2>
+                
+                <div className="border-b border-border-subtle mb-8 flex gap-8">
+                  <button className="pb-4 text-brand-accent border-b-2 border-brand-accent text-sm font-bold tracking-tight">Bun</button>
+                  <button className="pb-4 opacity-50 hover:opacity-100 text-sm font-medium">npm</button>
+                  <button className="pb-4 opacity-50 hover:opacity-100 text-sm font-medium">Source</button>
+                </div>
+
+                <div className="bg-dark-bg border border-border-subtle rounded-xl overflow-hidden shadow-2xl">
+                  <div className="bg-dark-bg/50 px-4 py-2 flex items-center gap-2 border-b border-border-subtle">
+                    <div className="w-2 h-2 rounded-full bg-brand-accent" />
+                    <span className="text-[10px] opacity-40 font-bold uppercase tracking-widest text-dark-text">shell</span>
+                  </div>
+                  <div className="p-6 font-mono text-sm group relative">
+                    <span className="opacity-40 mr-3 text-dark-text">$</span>
+                    <span className="text-dark-text">bun install -g shg-cli</span>
+                    <button className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-dark-bg/80 rounded">
+                      <Copy size={16} className="opacity-40"/>
+                    </button>
+                  </div>
+                </div>
+              </section>
             </div>
-            <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-              <div className="text-xs text-gray-500 uppercase mb-2">Initialize project</div>
-              <code className="text-brand-accent">shg setup --install --add-android</code>
-            </div>
-          </div>
-        </section>
 
-        <section id="commands" className="mb-16">
-          <h2 className="text-3xl font-bold mb-6">Command Reference</h2>
-          <div className="space-y-8">
-            <CommandDoc 
-              command="shg dev"
-              description="Start a live-reload dev server and launch the Android app."
-              flags={[
-                { flag: '--wifi', desc: 'Connect to device over WiFi' },
-                { flag: '--host <ip>', desc: 'Specify dev server host' },
-                { flag: '--port <port>', desc: 'Specify dev server port' }
-              ]}
-            />
-            <CommandDoc 
-              command="shg deploy"
-              description="Full pipeline: build, sync, and run the app."
-              flags={[
-                { flag: '--all', desc: 'Perform all steps (default)' },
-                { flag: '--build', desc: 'Build only' },
-                { flag: '--run', desc: 'Run only' }
-              ]}
-            />
+            <footer className="mt-20 pt-12 border-t border-border-subtle flex items-center justify-between opacity-50">
+              <div className="text-sm">
+                © 2026 SHG CLI — Sub-company of Xalo Software
+              </div>
+              <div className="flex gap-6">
+                <ExternalLink size={18} className="hover:text-brand-accent cursor-pointer transition-colors"/>
+                <Terminal size={18} className="hover:text-brand-accent cursor-pointer transition-colors"/>
+              </div>
+            </footer>
           </div>
-        </section>
+        </main>
 
-        <section id="configuration" className="mb-16">
-          <h2 className="text-3xl font-bold mb-6">Configuration</h2>
-          <p className="text-gray-400 mb-6">Customize SHG behavior via local or global configuration files.</p>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 overflow-x-auto">
-            <pre className="text-brand-primary text-sm">
-{`{
-  "defaultVariant": "debug",
-  "autoSyncBeforeRun": true,
-  "doctor": {
-    "autoRunBeforeDeploy": true
-  }
-}`}
-            </pre>
-          </div>
-        </section>
-
-        <footer className="pt-8 border-t border-gray-800 flex justify-between items-center text-gray-500 text-sm">
-          <span>© 2026 SHG CLI</span>
-          <a href="/" className="hover:text-brand-accent transition-colors flex items-center gap-1">
-            Back to Home <ExternalLink size={14} />
-          </a>
-        </footer>
-      </main>
+        {/* Right Sidebar - On this page */}
+        <aside className="hidden xl:block w-64 p-8 sticky top-14 h-[calc(100vh-3.5rem)] text-left">
+          <h4 className="text-xs font-bold uppercase tracking-wider mb-6 flex items-center gap-2">
+            <MenuIcon size={14}/> On this page
+          </h4>
+          <nav className="space-y-4">
+            <button className="block text-sm text-brand-accent font-bold">Overview</button>
+            <button className="block text-sm opacity-60 hover:opacity-100 transition-colors">Installation</button>
+            <button className="block text-sm opacity-60 hover:opacity-100 transition-colors">Prerequisites</button>
+            <button className="block text-sm opacity-60 hover:opacity-100 transition-colors">Uninstall</button>
+          </nav>
+        </aside>
+      </div>
     </div>
   );
 };
 
-interface CommandDocProps {
-  command: string;
-  description: string;
-  flags: { flag: string; desc: string }[];
-}
-
-const CommandDoc: React.FC<CommandDocProps> = ({ command, description, flags }) => (
-  <div className="border border-gray-800 rounded-xl p-6 bg-gray-900/30">
-    <div className="flex items-center gap-3 mb-3">
-      <div className="px-2 py-1 bg-brand-accent/20 text-brand-accent rounded text-sm font-bold">{command}</div>
-    </div>
-    <p className="text-gray-400 mb-4">{description}</p>
-    <div className="space-y-2">
-      {flags.map(f => (
-        <div key={f.flag} className="flex gap-4 text-sm">
-          <code className="text-gray-300 shrink-0 w-32">{f.flag}</code>
-          <span className="text-gray-500">{f.desc}</span>
-        </div>
-      ))}
-    </div>
-  </div>
+const NavTab = ({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) => (
+  <button className={`
+    flex items-center gap-2 px-3 py-2 rounded-md transition-colors
+    ${active ? 'text-dark-text bg-dark-bg/50 shadow-sm' : 'hover:opacity-100 hover:bg-dark-bg/30'}
+  `}>
+    {icon}
+    <span>{label}</span>
+  </button>
 );
 
 export default Docs;
