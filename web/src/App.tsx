@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, Terminal as TerminalIcon, Zap, Smartphone, Activity, ShieldCheck, Copy, Check, Code, Heart, Download } from 'lucide-react';
+import { ExternalLink, Terminal as TerminalIcon, Zap, Smartphone, Activity, ShieldCheck, Copy, Check, Code, Heart, Download, BookOpen } from 'lucide-react';
 import Logo from './components/Logo';
 import Terminal from './components/Terminal';
+import Docs from './pages/Docs';
 
-const App: React.FC = () => {
+const LandingPage = () => {
   return (
     <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-brand-accent selection:text-white">
       {/* Navigation */}
@@ -15,6 +17,10 @@ const App: React.FC = () => {
             <span className="font-bold text-xl tracking-tight hidden sm:block">SHG CLI</span>
           </div>
           <div className="flex items-center gap-6">
+            <Link to="/docs" className="hover:text-brand-accent transition-colors flex items-center gap-2">
+              <BookOpen size={20} />
+              <span className="hidden sm:inline">Docs</span>
+            </Link>
             <a href="https://github.com/Diplovee/shg" target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent transition-colors flex items-center gap-2">
               <ExternalLink size={20} />
               <span className="hidden sm:inline">GitHub</span>
@@ -150,6 +156,17 @@ const App: React.FC = () => {
         </div>
       </footer>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/docs" element={<Docs />} />
+      </Routes>
+    </Router>
   );
 };
 
