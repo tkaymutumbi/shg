@@ -1,6 +1,6 @@
 {
   "name": "shg-cli",
-  "version": "2026.4.0",
+  "version": "2026.4.1",
   "description": "A modern interactive CLI for Capacitor Android development",
   "main": "dist/index.js",
   "bin": {

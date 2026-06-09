@@ -4,6 +4,13 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.4.1] - 2026-06-09
+
+### Fixed
+- **shg dev --wifi**: remembers device IP across reboots via `~/.shg/wifi-state.json`
+- **shg dev**: properly checks for `index.html` in webDir before running, not just the directory
+- **shg dev**: clearer error when web build produces no output
+
 ## [2026.4.0] - 2026-06-08
 
 ### Added
