@@ -1,4 +1,4 @@
-export type RootCommand = "doctor" | "deploy" | "setup" | "run" | "devices" | "config" | "dev" | "logs" | "plugin" | "open" | "build" | "clean" | "assets" | "bump" | "upgrade";
+export type RootCommand = "doctor" | "deploy" | "setup" | "run" | "devices" | "config" | "dev" | "logs" | "plugin" | "open" | "build" | "clean" | "assets" | "bump" | "upgrade" | "create";
 
 export interface ParsedArgs {
   command?: RootCommand;
@@ -68,7 +68,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   const command = rest[0] as RootCommand | undefined;
-  const knownCommands: RootCommand[] = ["doctor", "deploy", "setup", "run", "devices", "config", "dev", "logs", "plugin", "open", "build", "clean", "assets", "bump", "upgrade"];
+  const knownCommands: RootCommand[] = ["doctor", "deploy", "setup", "run", "devices", "config", "dev", "logs", "plugin", "open", "build", "clean", "assets", "bump", "upgrade", "create"];
   if (command && !knownCommands.includes(command)) {
     errors.push(`Unknown command: ${command}`);
   }

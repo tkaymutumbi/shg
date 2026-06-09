@@ -27,6 +27,7 @@ SHG is a CLI tool that streamlines Capacitor Android development: building, sync
 | \`shg open\` | Open project in Android Studio |
 | \`shg bump\` | Bump versionName/versionCode |
 | \`shg upgrade\` | Check/upgrade Capacitor packages |
+| \`shg create\` | Scaffold a new app (React, Vue, Angular, etc.) with optional Capacitor + Android |
 | \`shg config\` | Read or update SHG configuration |
 
 ## Common Flags

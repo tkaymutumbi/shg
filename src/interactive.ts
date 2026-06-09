@@ -9,6 +9,7 @@ import { runLogs } from "./commands/logs.js";
 import { runOpen } from "./commands/open.js";
 import { runPlugin } from "./commands/plugin.js";
 import { runSetup } from "./commands/setup.js";
+import { runCreate } from "./commands/create.js";
 import { runUpgrade } from "./commands/upgrade.js";
 import type { CommandContext } from "./commands/types.js";
 
@@ -19,6 +20,7 @@ const CATEGORIES = [
   { value: "build", label: "Build APK/AAB", hint: "standalone debug or release build" },
   { value: "logs", label: "View Logs", hint: "tail logcat" },
   { value: "plugin", label: "Plugin Manager", hint: "add/list/sync" },
+  { value: "create", label: "Create App", hint: "scaffold a new project (React, Vue, Angular, etc.)" },
   { value: "assets", label: "Assets (Icons/Splash)", hint: "generate app assets" },
   { value: "open", label: "Open in Android Studio", hint: "launch Android Studio" },
   { value: "clean", label: "Clean Project", hint: "remove build artifacts" },
@@ -185,6 +187,12 @@ export async function runInteractive(context: CommandContext): Promise<number> {
   if (category === "assets") {
     const result = await runAssets(context);
     p.outro(result.exitCode === 0 ? chalk.cyan("Assets generated.") : chalk.red("Assets failed."));
+    return result.exitCode;
+  }
+
+  if (category === "create") {
+    const result = await runCreate(context);
+    p.outro(result.exitCode === 0 ? chalk.cyan("Project created.") : chalk.red("Create failed."));
     return result.exitCode;
   }
 

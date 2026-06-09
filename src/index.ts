@@ -7,6 +7,7 @@ import { runBuild } from "./commands/build.js";
 import { runBump } from "./commands/bump.js";
 import { runClean } from "./commands/clean.js";
 import { runConfig } from "./commands/config.js";
+import { runCreate } from "./commands/create.js";
 import { runDeploy } from "./commands/deploy.js";
 import { runDev } from "./commands/dev.js";
 import { runDevices } from "./commands/devices.js";
@@ -56,6 +57,7 @@ Commands:
   plugin                  Add/list/sync Capacitor plugins
   assets                  Generate app icons and splash screens
   open                    Open project in Android Studio
+  create                  Scaffold a new app (React, Vue, Angular, etc.)
   bump                    Bump versionName/versionCode
   upgrade                 Check/upgrade Capacitor packages
   config                  Read or update SHG config
@@ -74,6 +76,7 @@ Examples:
   shg plugin add @capacitor/camera
   shg assets
   shg open
+  shg create my-app                    Scaffold new app interactively
   shg bump --to 2026.4.0
   shg upgrade --run
   shg config set defaultVariant release
@@ -183,6 +186,8 @@ async function main(): Promise<void> {
     exitCode = (await runAssets(context)).exitCode;
   } else if (parsed.command === "bump") {
     exitCode = (await runBump(context)).exitCode;
+  } else if (parsed.command === "create") {
+    exitCode = (await runCreate(context, parsed.rest)).exitCode;
   } else if (parsed.command === "upgrade") {
     exitCode = (await runUpgrade(context)).exitCode;
   }
