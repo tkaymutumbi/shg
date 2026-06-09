@@ -20,6 +20,7 @@ import {
 import { Link } from 'react-router-dom';
 import { ThemeSwitcher } from '../App';
 import Logo from '../components/Logo';
+import Toast from '../components/Toast';
 
 const CATEGORIES = [
   { id: 'cli', label: 'CLI', icon: Terminal },
@@ -308,28 +309,38 @@ const renderTextWithCode = (text: string) => {
           className="bg-brand-accent/10 text-brand-accent px-1.5 py-0.5 rounded border border-brand-accent/20 font-mono text-sm mx-1 cursor-pointer hover:bg-brand-accent/20 transition-colors"
           onClick={() => {
             navigator.clipboard.writeText(command);
-            alert(`Copied: ${command}`);
+            showToast(`Copied: ${command}`);
           }}
           title="Click to copy"
-        >
+          >
           {command}
-        </code>
-      );
-    }
-    return part;
-  });
-};
+          </code>
+          );
+          }
+          return part;
+          });
+          };
 
-const Docs = () => {
-  const [activeCategory, setActiveCategory] = useState('cli');
-  const [activeSection, setActiveSection] = useState('welcome');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+          const Docs = () => {
+          const [activeCategory, setActiveCategory] = useState('cli');
+          const [activeSection, setActiveSection] = useState('welcome');
+          const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+          const [toast, setToast] = useState({ isVisible: false, message: '' });
 
-  const navigation = NAVIGATION[activeCategory] || NAVIGATION.cli;
-  const content = DOC_CONTENT[activeSection] || DOC_CONTENT.welcome;
+          const showToast = (message: string) => {
+          setToast({ isVisible: true, message });
+          };
 
-  return (
-    <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-brand-accent/30 transition-colors duration-300">
+          const navigation = NAVIGATION[activeCategory] || NAVIGATION.cli;
+          const content = DOC_CONTENT[activeSection] || DOC_CONTENT.welcome;
+
+          return (
+          <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-brand-accent/30 transition-colors duration-300">
+          <Toast 
+          message={toast.message} 
+          isVisible={toast.isVisible} 
+          onClose={() => setToast({ ...toast, isVisible: false })} 
+          />
       {/* Top Navbar */}
       <nav className="h-14 border-b border-border-subtle bg-nav-bg backdrop-blur-md sticky top-0 z-50 px-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-6">
