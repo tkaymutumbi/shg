@@ -1,8 +1,11 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync, symlinkSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
+import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { hasAndroidPlatform, webDirExists, readWebDir, findAndroidSdkRoot } from "../core/project.js";
+import { listAndroidDevices, connectOverWifi } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 const MIN_GRADLE_VERSION = 8;
@@ -39,6 +42,60 @@ async function checkCommandVersion(cmd: string, args: string[], title: string, f
     status: "fail",
     details: `${cmd} not available`,
     fix,
+  };
+}
+
+async function checkGradle(context: CommandContext): Promise<DoctorCheck> {
+  const gradleResult = await runCommand(
+    { label: "gradle --version", cmd: "gradle", args: ["--version"] },
+    { stdio: "pipe" },
+  );
+
+  if (gradleResult.success) {
+    const snippet = (gradleResult.stdout || gradleResult.stderr).split(/\r?\n/)[0] ?? "available";
+    return { id: "gradle", title: "Gradle", status: "pass", details: snippet.trim() };
+  }
+
+  if (context.projectRoot) {
+    const gradlewPath = join(context.projectRoot, "android", "gradlew");
+    if (existsSync(gradlewPath)) {
+      const wrapperResult = await runCommand(
+        { label: "gradlew --version", cmd: gradlewPath, args: ["--version"] },
+        { stdio: "pipe" },
+      );
+
+      if (wrapperResult.success) {
+        const snippet = (wrapperResult.stdout || wrapperResult.stderr).split(/\r?\n/)[0] ?? "available";
+        return {
+          id: "gradle",
+          title: "Gradle",
+          status: "pass",
+          details: `${snippet.trim()} (via wrapper)`,
+          fix: "Add Gradle to PATH for faster startup, or continue using the wrapper.",
+          safeFix: async () => {
+            const binDir = join(homedir(), ".local", "bin");
+            mkdirSync(binDir, { recursive: true });
+            const linkPath = join(binDir, "gradle");
+            try {
+              if (existsSync(linkPath)) unlinkSync(linkPath);
+              symlinkSync(gradlewPath, linkPath);
+              console.log(chalk.green(`  Linked gradlew → ${linkPath}`));
+              console.log(chalk.dim(`  Ensure ${binDir} is on your PATH.`));
+            } catch {
+              console.log(chalk.yellow("  Could not create symlink."));
+            }
+          },
+        };
+      }
+    }
+  }
+
+  return {
+    id: "gradle",
+    title: "Gradle",
+    status: "fail",
+    details: "gradle not available",
+    fix: "Install Gradle or use the Gradle wrapper.",
   };
 }
 
@@ -99,7 +156,30 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
     fix: sdkFix,
   });
 
-  checks.push(await checkCommandVersion("gradle", ["--version"], "Gradle", "Install Gradle or use the Gradle wrapper."));
+  const gradleCheck = await checkGradle(context);
+  checks.push(gradleCheck);
+
+  if (adbCheck.status === "pass") {
+    const devices = await listAndroidDevices();
+    if (devices.length === 0) {
+      checks.push({
+        id: "device",
+        title: "Android device connected",
+        status: "warn",
+        details: "No devices found",
+        fix: "Connect a device via USB, or use `shg doctor --fix` to connect wirelessly.",
+        safeFix: async () => { await connectOverWifi(); },
+      });
+    } else {
+      const deviceList = devices.map((d) => `${d.id} (${d.status})`).join(", ");
+      checks.push({
+        id: "device",
+        title: "Android device connected",
+        status: "pass",
+        details: `${devices.length} device(s): ${deviceList}`,
+      });
+    }
+  }
 
   if (!context.projectRoot) {
     checks.push({
@@ -180,7 +260,13 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
   if (fixEnabled) {
     for (const check of checks) {
       if (check.safeFix && check.status !== "pass") {
-        await check.safeFix();
+        const shouldFix = await p.confirm({
+          message: `Fix "${check.title}"? ${check.details}`,
+          initialValue: true,
+        });
+        if (shouldFix) {
+          await check.safeFix();
+        }
       }
     }
   }

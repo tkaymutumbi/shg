@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice } from "../core/project.js";
@@ -13,7 +14,7 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   }
 
   const wifi = Boolean(context.flags.wifi);
-  const host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? getLanIp() : "localhost");
+  let host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? getLanIp() : "localhost");
   const port = typeof context.flags.port === "string" ? context.flags.port : "5173";
 
   const adbOk = await ensureAdb();
@@ -68,20 +69,66 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     }
   }
 
-  if (wifi) {
+  let usingWifi = wifi;
+
+  if (usingWifi) {
     const wifiOk = await connectOverWifi();
     if (!wifiOk) return { exitCode: 1 };
-    console.log(chalk.cyan(`  Dev server will be accessible at http://${host}:${port} on your device\n`));
   }
 
-  const deviceAvailable = await hasConnectedDevice();
-  if (!deviceAvailable) {
-    console.error(chalk.red("No Android device or emulator detected."));
-    console.log(chalk.yellow("  USB: Connect a device via USB."));
-    console.log(chalk.yellow("  WiFi: Re-run with --wifi flag (USB connect required first time)."));
-    console.log(chalk.yellow("  Emulator: Start an AVD from Android Studio."));
-    console.log(chalk.dim("  Check: adb devices -l"));
-    return { exitCode: 1 };
+  if (!usingWifi) {
+    const deviceAvailable = await hasConnectedDevice();
+    if (!deviceAvailable) {
+      console.error(chalk.red("\nNo Android device or emulator detected.\n"));
+
+      const choice = await p.select({
+        message: "How would you like to connect?",
+        options: [
+          { value: "wifi", label: "WiFi", hint: "Connect wirelessly over network" },
+          { value: "usb", label: "USB", hint: "Connect via USB cable" },
+          { value: "emulator", label: "Emulator", hint: "Start an Android emulator" },
+          { value: "cancel", label: "Cancel", hint: "Exit" },
+        ],
+      });
+
+      if (p.isCancel(choice) || choice === "cancel") {
+        console.log(chalk.dim("\n  Run `shg dev --wifi` next time to skip this prompt."));
+        return { exitCode: 1 };
+      }
+
+      if (choice === "usb") {
+        console.log(chalk.yellow("  Connect your device via USB and ensure USB debugging is enabled."));
+        console.log(chalk.dim("  Settings → Developer Options → USB Debugging"));
+        console.log(chalk.dim("  Run `shg dev` again after connecting.\n"));
+        return { exitCode: 1 };
+      }
+
+      if (choice === "emulator") {
+        console.log(chalk.yellow("  Start an AVD from Android Studio, then run `shg dev` again."));
+        console.log(chalk.dim("  Tools → Device Manager → Create Device\n"));
+        return { exitCode: 1 };
+      }
+
+      if (choice === "wifi") {
+        const wifiOk = await connectOverWifi();
+        if (!wifiOk) return { exitCode: 1 };
+        usingWifi = true;
+      }
+
+      const recheck = await hasConnectedDevice();
+      if (!recheck) {
+        console.error(chalk.red("Still no device detected after connection attempt."));
+        return { exitCode: 1 };
+      }
+    }
+  }
+
+  if (usingWifi && !context.flags.host && host === "localhost") {
+    host = getLanIp();
+  }
+
+  if (usingWifi) {
+    console.log(chalk.cyan(`  Dev server will be accessible at http://${host}:${port} on your device\n`));
   }
 
   console.log(chalk.cyan("\nStarting live reload dev server + Android app\n"));

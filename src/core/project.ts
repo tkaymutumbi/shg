@@ -50,6 +50,25 @@ export function readWebDir(projectRoot: string): string {
   }
 }
 
+export function readAppId(projectRoot: string): string | undefined {
+  const configFile = CONFIG_FILES.find((f) => existsSync(join(projectRoot, f)));
+  if (!configFile) return undefined;
+
+  try {
+    const raw = readFileSync(join(projectRoot, configFile), "utf8");
+
+    if (configFile.endsWith(".json")) {
+      const parsed = JSON.parse(raw);
+      return parsed.appId;
+    }
+
+    const match = raw.match(/appId\s*[:=]\s*['"]([^'"]+)['"]/);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
 export function webDirExists(projectRoot: string): boolean {
   const webDir = readWebDir(projectRoot);
   return existsSync(join(projectRoot, webDir));

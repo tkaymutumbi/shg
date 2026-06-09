@@ -75,7 +75,8 @@ export async function runDeploy(context: CommandContext): Promise<CommandResult>
     if (step === "run") {
       const runResult = await runRun(context, { skipSync: true });
       if (runResult.exitCode !== 0) {
-        console.error(chalk.red("Deploy failed at run step."));
+        console.error(chalk.red("\nDeploy failed at run step: could not install and launch the app."));
+        console.log(chalk.yellow("Run `shg doctor` to check device connectivity, or `shg devices --help`."));
         return runResult;
       }
     }

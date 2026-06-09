@@ -198,7 +198,7 @@ function getWifiStatePath(): string {
   return join(homedir(), ".shg", "wifi-state.json");
 }
 
-function loadWifiIp(): string | undefined {
+export function loadWifiIp(): string | undefined {
   const state = readJsonFile<{ lastIp: string }>(getWifiStatePath());
   return state?.lastIp;
 }
