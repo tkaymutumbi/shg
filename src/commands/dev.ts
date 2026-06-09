@@ -43,20 +43,27 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
 
   const webDir = readWebDir(context.projectRoot);
   const webDirPath = join(context.projectRoot, webDir);
+  const indexHtml = join(webDirPath, "index.html");
 
-  if (!existsSync(webDirPath)) {
+  if (!existsSync(indexHtml)) {
     if (context.flags["skip-build"]) {
-      console.log(chalk.yellow(`Web assets directory "${webDir}" not found. Creating empty directory...`));
-      mkdirSync(webDirPath, { recursive: true });
+      if (!existsSync(webDirPath)) {
+        mkdirSync(webDirPath, { recursive: true });
+      }
     } else {
-      console.log(chalk.yellow(`Web assets directory "${webDir}" not found. Running build...`));
+      if (existsSync(webDirPath)) {
+        console.log(chalk.yellow(`"${webDir}/index.html" not found. Running build...`));
+      } else {
+        console.log(chalk.yellow(`Web assets directory "${webDir}" not found. Running build...`));
+      }
       const buildResult = await runCommand(
         { label: "bun run build", cmd: "bun", args: ["run", "build"], cwd: context.projectRoot },
         { verbose: context.verbose, stdio: "inherit" },
       );
-      if (!buildResult.success) {
-        console.log(chalk.yellow(`Build failed. Creating empty "${webDir}" directory so Capacitor can still proceed...`));
-        mkdirSync(webDirPath, { recursive: true });
+      if (!buildResult.success || !existsSync(indexHtml)) {
+        console.log(chalk.yellow(`Build did not produce "${webDir}/index.html". Create it or check your build config.`));
+        console.log(chalk.dim(`  Expected: ${indexHtml}`));
+        return { exitCode: 1 };
       }
     }
   }
