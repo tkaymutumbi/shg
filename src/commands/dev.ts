@@ -3,15 +3,13 @@ import { join } from "node:path";
 import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice } from "../core/project.js";
+import { requireProjectRoot, hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice } from "../core/project.js";
 import { ensureAdb, connectOverWifi, getLanIp } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDev(context: CommandContext): Promise<CommandResult> {
-  if (!context.projectRoot) {
-    console.error(chalk.red("Dev command requires a Capacitor project root."));
-    return { exitCode: 1 };
-  }
+  const projectRoot = requireProjectRoot(context, "Dev");
+  if (!projectRoot) return { exitCode: 1 };
 
   const wifi = Boolean(context.flags.wifi);
   let host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? getLanIp() : "localhost");
@@ -24,7 +22,7 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     return { exitCode: 1 };
   }
 
-  if (!hasAndroidPlatform(context.projectRoot)) {
+  if (!hasAndroidPlatform(projectRoot)) {
     console.error(chalk.red("Android platform not found."));
     console.log(chalk.yellow("  Run: shg setup --add-android"));
     return { exitCode: 1 };
@@ -42,8 +40,8 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     }
   }
 
-  const webDir = readWebDir(context.projectRoot);
-  const webDirPath = join(context.projectRoot, webDir);
+  const webDir = readWebDir(projectRoot);
+  const webDirPath = join(projectRoot, webDir);
   const indexHtml = join(webDirPath, "index.html");
 
   if (!existsSync(indexHtml)) {
@@ -58,7 +56,7 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
         console.log(chalk.yellow(`Web assets directory "${webDir}" not found. Running build...`));
       }
       const buildResult = await runCommand(
-        { label: "bun run build", cmd: "bun", args: ["run", "build"], cwd: context.projectRoot },
+        { label: "bun run build", cmd: "bun", args: ["run", "build"], cwd: projectRoot },
         { verbose: context.verbose, stdio: "inherit" },
       );
       if (!buildResult.success || !existsSync(indexHtml)) {
@@ -137,8 +135,8 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     {
       label: "bunx cap run android --livereload",
       cmd: "bunx",
-      args: ["cap", "run", "android", "--live-reload", `--host=${host}`, `--port=${port}`],
-      cwd: context.projectRoot,
+      args: ["cap", "run", "android", "--livereload", `--host=${host}`, `--port=${port}`],
+      cwd: projectRoot,
     },
     { verbose: context.verbose, stdio: "inherit" },
   );

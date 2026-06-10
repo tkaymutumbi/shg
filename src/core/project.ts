@@ -1,10 +1,12 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 import { homedir } from "node:os";
+import chalk from "chalk";
 import { execaSync } from "execa";
 import { runCommand } from "./executor.js";
+import type { CommandContext } from "../commands/types.js";
 
-const CONFIG_FILES = ["capacitor.config.ts", "capacitor.config.js", "capacitor.config.json"];
+export const CONFIG_FILES = ["capacitor.config.ts", "capacitor.config.js", "capacitor.config.json"];
 
 export function findProjectRoot(startDir: string = process.cwd()): string | undefined {
   let current = resolve(startDir);
@@ -32,25 +34,14 @@ export function isCapacitorProject(dir: string = process.cwd()): boolean {
 }
 
 export function readWebDir(projectRoot: string): string {
-  const configFile = CONFIG_FILES.find((f) => existsSync(join(projectRoot, f)));
-  if (!configFile) return "dist";
-
-  try {
-    const raw = readFileSync(join(projectRoot, configFile), "utf8");
-
-    if (configFile.endsWith(".json")) {
-      const parsed = JSON.parse(raw);
-      return parsed.webDir ?? "dist";
-    }
-
-    const match = raw.match(/webDir\s*[:=]\s*["']([^"']+)["']/);
-    return match ? match[1] : "dist";
-  } catch {
-    return "dist";
-  }
+  return readCapacitorConfigValue(projectRoot, "webDir") ?? "dist";
 }
 
 export function readAppId(projectRoot: string): string | undefined {
+  return readCapacitorConfigValue(projectRoot, "appId");
+}
+
+function readCapacitorConfigValue(projectRoot: string, key: string): string | undefined {
   const configFile = CONFIG_FILES.find((f) => existsSync(join(projectRoot, f)));
   if (!configFile) return undefined;
 
@@ -59,10 +50,11 @@ export function readAppId(projectRoot: string): string | undefined {
 
     if (configFile.endsWith(".json")) {
       const parsed = JSON.parse(raw);
-      return parsed.appId;
+      const value = parsed[key];
+      return typeof value === "string" ? value : undefined;
     }
 
-    const match = raw.match(/appId\s*[:=]\s*['"]([^'"]+)['"]/);
+    const match = raw.match(new RegExp(`${key}\\s*[:=]\\s*['"]([^'"]+)['"]`));
     return match?.[1];
   } catch {
     return undefined;
@@ -170,4 +162,16 @@ export async function hasConnectedDevice(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export function requireProjectRoot(context: CommandContext, commandName: string): string | undefined {
+  if (!context.projectRoot) {
+    console.error(chalk.red(`${commandName} command requires a Capacitor project root.`));
+    return undefined;
+  }
+  return context.projectRoot;
+}
+
+export function emitJson(data: Record<string, unknown>): void {
+  console.log(JSON.stringify(data, null, 2));
 }

@@ -20,9 +20,15 @@
   <a href="https://github.com/Diplovee/shg/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat" alt="PRs"></a>
 </p>
 
+<p align="center">
+  <a href="web/"><strong>📖 Documentation Website</strong></a>
+</p>
+
 ---
 
 SHG streamlines every Capacitor Android workflow — from project setup and live-reload development to building signed APKs and bumping versions — so you spend less time on CLI incantations and more time building your app.
+
+The project also includes a [documentation website](web/) (React + Vite) with full docs, command reference, and a searchable interface.
 
 ## Features
 

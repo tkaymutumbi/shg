@@ -1,17 +1,16 @@
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
+import { requireProjectRoot } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runAssets(context: CommandContext): Promise<CommandResult> {
-  if (!context.projectRoot) {
-    console.error(chalk.red("Assets command requires a Capacitor project root."));
-    return { exitCode: 1 };
-  }
+  const projectRoot = requireProjectRoot(context, "Assets");
+  if (!projectRoot) return { exitCode: 1 };
 
   console.log(chalk.cyan("Generating app icons and splash screens..."));
 
   const result = await runCommand(
-    { label: "bunx capacitor-assets generate", cmd: "bunx", args: ["capacitor-assets", "generate"], cwd: context.projectRoot },
+    { label: "bunx capacitor-assets generate", cmd: "bunx", args: ["capacitor-assets", "generate"], cwd: projectRoot },
     { verbose: context.verbose, stdio: "inherit" },
   );
 

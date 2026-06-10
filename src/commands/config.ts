@@ -2,13 +2,14 @@ import chalk from "chalk";
 import {
   DEFAULT_CONFIG,
   loadMergedConfig,
-  writeGlobalConfig,
-  writeLocalConfig,
+  getGlobalConfigPath,
+  getLocalConfigPath,
   type ShgConfig,
 } from "../core/config.js";
+import { readJsonFile, writeJsonFile } from "../core/fsjson.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
-function setDeepValue(target: Record<string, unknown>, path: string, value: unknown): void {
+export function setDeepValue(target: Record<string, unknown>, path: string, value: unknown): void {
   const keys = path.split(".");
   let current: Record<string, unknown> = target;
   for (let i = 0; i < keys.length - 1; i += 1) {
@@ -21,7 +22,7 @@ function setDeepValue(target: Record<string, unknown>, path: string, value: unkn
   current[keys[keys.length - 1]] = value;
 }
 
-function parseValue(raw: string): string | boolean | number {
+export function parseValue(raw: string): string | boolean | number {
   if (raw === "true") return true;
   if (raw === "false") return false;
   const numeric = Number(raw);
@@ -87,22 +88,24 @@ export async function runConfig(context: CommandContext, rest: string[]): Promis
       return { exitCode: 2 };
     }
 
-    const base = { ...DEFAULT_CONFIG, ...context.config } as Record<string, unknown>;
-    setDeepValue(base, key, parseValue(rawValue));
+    let scopeConfig: Record<string, unknown>;
+    let configPath: string;
 
     if (scope === "global") {
-      const path = writeGlobalConfig(base as unknown as ShgConfig);
-      console.log(chalk.green(`Updated global config: ${path}`));
-      return { exitCode: 0 };
+      configPath = getGlobalConfigPath();
+      scopeConfig = readJsonFile<Record<string, unknown>>(configPath) ?? {};
+    } else {
+      if (!context.projectRoot) {
+        console.error(chalk.red("Local config set requires a Capacitor project."));
+        return { exitCode: 1 };
+      }
+      configPath = getLocalConfigPath(context.projectRoot);
+      scopeConfig = readJsonFile<Record<string, unknown>>(configPath) ?? {};
     }
 
-    if (!context.projectRoot) {
-      console.error(chalk.red("Local config set requires a Capacitor project."));
-      return { exitCode: 1 };
-    }
-
-    const path = writeLocalConfig(context.projectRoot, base as unknown as ShgConfig);
-    console.log(chalk.green(`Updated local config: ${path}`));
+    setDeepValue(scopeConfig, key, parseValue(rawValue));
+    writeJsonFile(configPath, scopeConfig);
+    console.log(chalk.green(`Updated ${scope} config: ${configPath}`));
     return { exitCode: 0 };
   }
 

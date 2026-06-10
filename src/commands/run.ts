@@ -3,7 +3,7 @@ import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { listAndroidDevices, connectOverWifi, loadWifiIp } from "../core/android.js";
-import { readAppId } from "../core/project.js";
+import { requireProjectRoot, readAppId } from "../core/project.js";
 import { loadState, saveState } from "../core/state.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
@@ -11,21 +11,13 @@ export interface RunOptions {
   skipSync?: boolean;
 }
 
-function getStringFlag(flags: Record<string, string | boolean>, key: string): string | undefined {
+export function getStringFlag(flags: Record<string, string | boolean>, key: string): string | undefined {
   const value = flags[key];
   return typeof value === "string" ? value : undefined;
 }
 
-function resolveRunValues(context: CommandContext) {
-  if (!context.projectRoot) {
-    return {
-      device: getStringFlag(context.flags, "device") ?? context.config.defaultDeviceId,
-      variant: getStringFlag(context.flags, "variant") ?? context.config.defaultVariant,
-      flavor: getStringFlag(context.flags, "flavor") ?? context.config.defaultFlavor,
-    };
-  }
-
-  const state = loadState(context.projectRoot);
+function resolveRunValues(projectRoot: string, context: CommandContext) {
+  const state = loadState(projectRoot);
   return {
     device: getStringFlag(context.flags, "device") || context.config.defaultDeviceId || state.lastDeviceId,
     variant: getStringFlag(context.flags, "variant") || context.config.defaultVariant || state.lastVariant || "debug",
@@ -34,12 +26,10 @@ function resolveRunValues(context: CommandContext) {
 }
 
 export async function runRun(context: CommandContext, options: RunOptions = {}): Promise<CommandResult> {
-  if (!context.projectRoot) {
-    console.error(chalk.red("Run command requires a Capacitor project root."));
-    return { exitCode: 1 };
-  }
+  const projectRoot = requireProjectRoot(context, "Run");
+  if (!projectRoot) return { exitCode: 1 };
 
-  const { device, variant, flavor } = resolveRunValues(context);
+  const { device, variant, flavor } = resolveRunValues(projectRoot, context);
 
   const devices = await listAndroidDevices();
   const deviceConnected = !device || devices.some((d) => d.id === device);
@@ -71,7 +61,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
           label: "bunx cap sync android",
           cmd: "bunx",
           args: ["cap", "sync", "android"],
-          cwd: context.projectRoot,
+          cwd: projectRoot,
         },
         { verbose: context.verbose, stdio: "inherit" },
       );
@@ -97,7 +87,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
       label: "bunx cap run android",
       cmd: "bunx",
       args,
-      cwd: context.projectRoot,
+      cwd: projectRoot,
     },
     { verbose: context.verbose, stdio: "inherit" },
   );
@@ -116,13 +106,13 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
         const reconnected = await connectOverWifi();
         if (reconnected) {
           const apkPath = join(
-            context.projectRoot!,
+            projectRoot,
             "android", "app", "build", "outputs", "apk",
             variant === "release" ? "release" : "debug",
             `app-${variant === "release" ? "release" : "debug"}.apk`,
           );
 
-          const appId = readAppId(context.projectRoot!);
+          const appId = readAppId(projectRoot);
           if (!appId) {
             console.error(chalk.red("Could not determine app package name from capacitor config."));
             return { exitCode: 1 };
@@ -134,14 +124,14 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
               label: "adb install and launch",
               cmd: "adb",
               args: ["-s", device, "shell", "monkey", "-p", appId, "1"],
-              cwd: context.projectRoot,
+              cwd: projectRoot,
             },
             { stdio: "inherit" },
           );
 
           if (relaunchResult.success) {
             console.log(chalk.green("App re-launched successfully after reconnection.\n"));
-            saveState(context.projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
+            saveState(projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
             return { exitCode: 0 };
           }
 
@@ -151,14 +141,14 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
               label: "adb install -r",
               cmd: "adb",
               args: ["-s", device, "install", "-r", "-d", apkPath],
-              cwd: context.projectRoot,
+              cwd: projectRoot,
             },
             { stdio: "inherit" },
           );
 
           if (reinstallResult.success) {
             console.log(chalk.green("App re-installed and will launch automatically.\n"));
-            saveState(context.projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
+            saveState(projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
             return { exitCode: 0 };
           }
         }
@@ -168,7 +158,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     return { exitCode: 1 };
   }
 
-  saveState(context.projectRoot, {
+  saveState(projectRoot, {
     lastDeviceId: device,
     lastVariant: variant,
     lastFlavor: flavor,

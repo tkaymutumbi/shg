@@ -1,10 +1,11 @@
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
+import { requireProjectRoot } from "../core/project.js";
 import { runDoctor } from "./doctor.js";
 import { runRun } from "./run.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
-function selectedDeploySteps(flags: Record<string, string | boolean>): Array<"build" | "sync" | "run"> {
+export function selectedDeploySteps(flags: Record<string, string | boolean>): Array<"build" | "sync" | "run"> {
   if (flags.all) {
     return ["build", "sync", "run"];
   }
@@ -18,10 +19,8 @@ function selectedDeploySteps(flags: Record<string, string | boolean>): Array<"bu
 }
 
 export async function runDeploy(context: CommandContext): Promise<CommandResult> {
-  if (!context.projectRoot) {
-    console.error(chalk.red("Deploy command requires a Capacitor project root."));
-    return { exitCode: 1 };
-  }
+  const projectRoot = requireProjectRoot(context, "Deploy");
+  if (!projectRoot) return { exitCode: 1 };
 
   const explicitFlags = ["all", "build", "sync", "run"].filter((key) => Boolean(context.flags[key]));
   if (context.flags.all && explicitFlags.length > 1) {
@@ -46,7 +45,7 @@ export async function runDeploy(context: CommandContext): Promise<CommandResult>
           label: "bun run build",
           cmd: "bun",
           args: ["run", "build"],
-          cwd: context.projectRoot,
+          cwd: projectRoot,
         },
         { verbose: context.verbose, stdio: "inherit" },
       );
@@ -62,7 +61,7 @@ export async function runDeploy(context: CommandContext): Promise<CommandResult>
           label: "bunx cap sync android",
           cmd: "bunx",
           args: ["cap", "sync", "android"],
-          cwd: context.projectRoot,
+          cwd: projectRoot,
         },
         { verbose: context.verbose, stdio: "inherit" },
       );

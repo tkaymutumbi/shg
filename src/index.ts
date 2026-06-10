@@ -2,6 +2,7 @@
 
 import chalk from "chalk";
 import figlet from "figlet";
+import type { CommandContext, CommandResult } from "./commands/types.js";
 import { runAssets } from "./commands/assets.js";
 import { runBuild } from "./commands/build.js";
 import { runBump } from "./commands/bump.js";
@@ -18,14 +19,33 @@ import { runPlugin } from "./commands/plugin.js";
 import { runRun } from "./commands/run.js";
 import { runSetup } from "./commands/setup.js";
 import { runUpgrade } from "./commands/upgrade.js";
-import type { CommandContext } from "./commands/types.js";
 import { parseArgs } from "./core/args.js";
 import { loadMergedConfig } from "./core/config.js";
-import { findProjectRoot } from "./core/project.js";
+import { findProjectRoot, findAndroidSdkRoot } from "./core/project.js";
 import { CLI_VERSION } from "./core/version.js";
 import { runInteractive } from "./interactive.js";
 import { ensureAgentDoc } from "./core/agent-doc.js";
-import { findAndroidSdkRoot } from "./core/project.js";
+
+type CommandHandler = (context: CommandContext, rest: string[]) => Promise<CommandResult>;
+
+const COMMAND_REGISTRY: Record<string, CommandHandler> = {
+  assets: (ctx) => runAssets(ctx),
+  build: (ctx) => runBuild(ctx),
+  bump: (ctx) => runBump(ctx),
+  clean: (ctx) => runClean(ctx),
+  config: (ctx, rest) => runConfig(ctx, rest),
+  create: (ctx, rest) => runCreate(ctx, rest),
+  deploy: (ctx) => runDeploy(ctx),
+  dev: (ctx) => runDev(ctx),
+  devices: (ctx) => runDevices(ctx),
+  doctor: (ctx) => runDoctor(ctx),
+  logs: (ctx) => runLogs(ctx),
+  open: (ctx) => runOpen(ctx),
+  plugin: (ctx, rest) => runPlugin(ctx, rest),
+  run: (ctx) => runRun(ctx),
+  setup: (ctx) => runSetup(ctx),
+  upgrade: (ctx) => runUpgrade(ctx),
+};
 
 const ascii = figlet.textSync("SHG", {
   font: "ANSI Shadow",
@@ -157,42 +177,13 @@ async function main(): Promise<void> {
     process.exit(code);
   }
 
-  let exitCode = 0;
-  if (parsed.command === "doctor") {
-    exitCode = (await runDoctor(context)).exitCode;
-  } else if (parsed.command === "deploy") {
-    exitCode = (await runDeploy(context)).exitCode;
-  } else if (parsed.command === "setup") {
-    exitCode = (await runSetup(context)).exitCode;
-  } else if (parsed.command === "run") {
-    exitCode = (await runRun(context)).exitCode;
-  } else if (parsed.command === "devices") {
-    exitCode = (await runDevices(context)).exitCode;
-  } else if (parsed.command === "config") {
-    exitCode = (await runConfig(context, parsed.rest)).exitCode;
-  } else if (parsed.command === "dev") {
-    exitCode = (await runDev(context)).exitCode;
-  } else if (parsed.command === "logs") {
-    exitCode = (await runLogs(context)).exitCode;
-  } else if (parsed.command === "plugin") {
-    exitCode = (await runPlugin(context, parsed.rest)).exitCode;
-  } else if (parsed.command === "open") {
-    exitCode = (await runOpen(context)).exitCode;
-  } else if (parsed.command === "build") {
-    exitCode = (await runBuild(context)).exitCode;
-  } else if (parsed.command === "clean") {
-    exitCode = (await runClean(context)).exitCode;
-  } else if (parsed.command === "assets") {
-    exitCode = (await runAssets(context)).exitCode;
-  } else if (parsed.command === "bump") {
-    exitCode = (await runBump(context)).exitCode;
-  } else if (parsed.command === "create") {
-    exitCode = (await runCreate(context, parsed.rest)).exitCode;
-  } else if (parsed.command === "upgrade") {
-    exitCode = (await runUpgrade(context)).exitCode;
+  const handler = COMMAND_REGISTRY[parsed.command];
+  if (handler) {
+    const result = await handler(context, parsed.rest);
+    process.exit(result.exitCode);
   }
 
-  process.exit(exitCode);
+  process.exit(0);
 }
 
 void main();

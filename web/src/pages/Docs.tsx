@@ -35,25 +35,20 @@ const CodeBlock = ({ content, language, onCopy }: CodeBlockProps) => {
   );
 };
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Search, 
   Terminal, 
   Box, 
   Layout, 
   TestTube, 
-  BookOpen, 
-  Newspaper, 
-  MessageSquare, 
   Check,
   Download, 
   ChevronRight,
   Menu as MenuIcon,
   X,
   Copy,
-  Lightbulb,
-  ExternalLink,
-  ChevronDown
+  ExternalLink
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ThemeSwitcher } from '../App';
@@ -342,6 +337,32 @@ const Docs = () => {
   const [activeSection, setActiveSection] = useState('welcome');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toast, setToast] = useState({ isVisible: false, message: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase();
+    const results: { id: string; badge: string; title: string; description: string }[] = [];
+    for (const [id, doc] of Object.entries(DOC_CONTENT)) {
+      const matchTitle = doc.title.toLowerCase().includes(q);
+      const matchDesc = doc.description.toLowerCase().includes(q);
+      let foundSection = false;
+      for (const section of doc.sections) {
+        if (section.content && typeof section.content === 'string' && section.content.toLowerCase().includes(q)) {
+          foundSection = true;
+          break;
+        }
+        if (section.title && section.title.toLowerCase().includes(q)) {
+          foundSection = true;
+          break;
+        }
+      }
+      if (matchTitle || matchDesc || foundSection) {
+        results.push({ id, badge: doc.badge, title: doc.title, description: doc.description });
+      }
+    }
+    return results;
+  }, [searchQuery]);
 
   const showToast = (message: string) => {
     setToast({ isVisible: true, message });
@@ -413,6 +434,8 @@ const Docs = () => {
           <input 
             type="text" 
             placeholder="Search docs..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-dark-bg/50 border border-border-subtle rounded-md py-1.5 pl-10 pr-4 text-sm focus:outline-none focus:border-brand-accent transition-colors"
           />
         </div>
@@ -477,58 +500,93 @@ const Docs = () => {
         {/* Central Content */}
         <main className="flex-1 min-w-0 p-8 lg:p-12 overflow-y-auto h-[calc(100vh-3.5rem)] scroll-smooth text-left">
           <div className="max-w-3xl">
-            <header className="mb-12">
-              <div className="text-brand-accent text-sm font-bold mb-4 uppercase tracking-wider">{content.badge}</div>
-              <h1 className="text-5xl font-black mb-6 tracking-tight">{content.title}</h1>
-              <p className="text-xl opacity-60 leading-relaxed">
-                {content.description}
-              </p>
-            </header>
+            {searchResults !== null ? (
+              <>
+                <header className="mb-8">
+                  <h1 className="text-3xl font-bold mb-2">Search results</h1>
+                  <p className="opacity-60">
+                    {searchResults.length === 0 
+                      ? `No results found for "${searchQuery}"`
+                      : `${searchResults.length} result${searchResults.length === 1 ? '' : 's'} for "${searchQuery}"`
+                    }
+                  </p>
+                </header>
+                {searchResults.length > 0 && (
+                  <div className="space-y-3">
+                    {searchResults.map((result) => (
+                      <button
+                        key={result.id}
+                        onClick={() => {
+                          setSearchQuery('');
+                          setActiveSection(result.id);
+                          window.scrollTo(0, 0);
+                        }}
+                        className="w-full text-left bg-dark-bg/30 border border-border-subtle p-4 rounded-xl hover:border-brand-accent/40 transition-all group"
+                      >
+                        <div className="text-xs text-brand-accent font-bold mb-1 uppercase tracking-wider">{result.badge}</div>
+                        <div className="font-bold mb-1 group-hover:text-brand-accent transition-colors">{result.title}</div>
+                        <div className="text-sm opacity-60 line-clamp-2">{result.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <header className="mb-12">
+                  <div className="text-brand-accent text-sm font-bold mb-4 uppercase tracking-wider">{content.badge}</div>
+                  <h1 className="text-5xl font-black mb-6 tracking-tight">{content.title}</h1>
+                  <p className="text-xl opacity-60 leading-relaxed">
+                    {content.description}
+                  </p>
+                </header>
 
-            <div className="space-y-12">
-              {content.sections.map((section: any) => (
-                <section key={section.id} id={section.id}>
-                  {section.title && <h2 className="text-3xl font-bold mb-6 tracking-tight">{section.title}</h2>}
+                <div className="space-y-12">
+                  {content.sections.map((section: any) => (
+                    <section key={section.id} id={section.id}>
+                      {section.title && <h2 className="text-3xl font-bold mb-6 tracking-tight">{section.title}</h2>}
 
-                  {section.type === 'text' && (
-                    <p className="opacity-70 leading-7 mb-6 text-lg whitespace-pre-line">
-                      {renderTextWithCode(section.content)}
-                    </p>
-                  )}
+                      {section.type === 'text' && (
+                        <p className="opacity-70 leading-7 mb-6 text-lg whitespace-pre-line">
+                          {renderTextWithCode(section.content)}
+                        </p>
+                      )}
 
-                  {section.type === 'code' && (
-                    <CodeBlock content={section.content} language={section.language} onCopy={showToast} />
-                  )}
+                      {section.type === 'code' && (
+                        <CodeBlock content={section.content} language={section.language} onCopy={showToast} />
+                      )}
 
 
-                  {section.type === 'list' && (
-                    <div className="grid grid-cols-1 gap-4 mb-6">
-                      {section.items.map((item: any, idx: number) => (
-                        <div key={idx} className="bg-dark-bg/30 border border-border-subtle p-4 rounded-xl flex gap-4">
-                          <div className="text-brand-accent font-bold opacity-40">{idx + 1}.</div>
-                          <div>
-                            <div className="font-bold mb-1">{item.title}</div>
-                            <div className="text-sm opacity-60">{renderTextWithCode(item.description)}</div>
-                          </div>
+                      {section.type === 'list' && (
+                        <div className="grid grid-cols-1 gap-4 mb-6">
+                          {section.items.map((item: any, idx: number) => (
+                            <div key={idx} className="bg-dark-bg/30 border border-border-subtle p-4 rounded-xl flex gap-4">
+                              <div className="text-brand-accent font-bold opacity-40">{idx + 1}.</div>
+                              <div>
+                                <div className="font-bold mb-1">{item.title}</div>
+                                <div className="text-sm opacity-60">{renderTextWithCode(item.description)}</div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              ))}
-            </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
 
-            <footer className="mt-20 pt-12 border-t border-border-subtle flex items-center justify-between opacity-50">
-              <div className="text-sm">
-                © 2026 SHG CLI — Simplified Hybrid Gateway
-              </div>
-              <div className="flex gap-6">
-                <a href="https://github.com/Diplovee/shg" target="_blank" rel="noopener noreferrer">
-                  <ExternalLink size={18} className="hover:text-brand-accent cursor-pointer transition-colors"/>
-                </a>
-                <Terminal size={18} className="hover:text-brand-accent cursor-pointer transition-colors"/>
-              </div>
-            </footer>
+                <footer className="mt-20 pt-12 border-t border-border-subtle flex items-center justify-between opacity-50">
+                  <div className="text-sm">
+                    © 2026 SHG CLI — Simplified Hybrid Gateway
+                  </div>
+                  <div className="flex gap-6">
+                    <a href="https://github.com/Diplovee/shg" target="_blank" rel="noopener noreferrer">
+                      <ExternalLink size={18} className="hover:text-brand-accent cursor-pointer transition-colors"/>
+                    </a>
+                    <Terminal size={18} className="hover:text-brand-accent cursor-pointer transition-colors"/>
+                  </div>
+                </footer>
+              </>
+            )}
           </div>
         </main>
 

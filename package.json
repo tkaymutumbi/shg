@@ -10,6 +10,7 @@
     "build": "bun run tsc",
     "typecheck": "bun run tsc --noEmit",
     "smoke": "bun run typecheck && bun run build",
+    "test": "bun test",
     "dev": "bun src/index.ts",
     "start": "bun dist/index.js",
     "prepublishOnly": "bun run build"

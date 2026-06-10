@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
+import { requireProjectRoot, emitJson } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 interface CleanTarget {
@@ -9,7 +10,7 @@ interface CleanTarget {
   path: string;
 }
 
-function getCleanTargets(projectRoot: string): CleanTarget[] {
+export function getCleanTargets(projectRoot: string): CleanTarget[] {
   return [
     { label: "Android build", path: join(projectRoot, "android", "build") },
     { label: "Android gradle cache", path: join(projectRoot, "android", ".gradle") },
@@ -20,12 +21,10 @@ function getCleanTargets(projectRoot: string): CleanTarget[] {
 }
 
 export async function runClean(context: CommandContext): Promise<CommandResult> {
-  if (!context.projectRoot) {
-    console.error(chalk.red("Clean command requires a Capacitor project root."));
-    return { exitCode: 1 };
-  }
+  const projectRoot = requireProjectRoot(context, "Clean");
+  if (!projectRoot) return { exitCode: 1 };
 
-  const targets = getCleanTargets(context.projectRoot);
+  const targets = getCleanTargets(projectRoot);
   let cleaned = 0;
 
   console.log(chalk.cyan("\nCleaning project artifacts...\n"));
@@ -38,7 +37,7 @@ export async function runClean(context: CommandContext): Promise<CommandResult> 
 
     console.log(chalk.yellow(`  Cleaning ${target.label}...`));
     const result = await runCommand(
-      { label: `rm -rf ${target.path}`, cmd: "rm", args: ["-rf", target.path], cwd: context.projectRoot },
+      { label: `rm -rf ${target.path}`, cmd: "rm", args: ["-rf", target.path], cwd: projectRoot },
       { verbose: context.verbose, stdio: "pipe" },
     );
 
@@ -50,7 +49,7 @@ export async function runClean(context: CommandContext): Promise<CommandResult> 
   }
 
   if (context.json || context.flags.json) {
-    console.log(JSON.stringify({ cleaned, targets: targets.length }, null, 2));
+    emitJson({ cleaned, targets: targets.length });
     return { exitCode: 0 };
   }
 

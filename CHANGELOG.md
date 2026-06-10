@@ -4,6 +4,25 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.4.2] - 2026-06-10
+
+### Added
+- **Comprehensive test suite**: 130 tests across 9 files, covering all commands, core modules, and interactive mode
+- **`bun test`** script in `package.json`
+- **New shared helpers**: `requireProjectRoot`, `emitJson`, `readCapacitorConfigValue` in `project.ts`
+- **`isCancelled()`** helper in `interactive.ts`
+
+### Fixed
+- **`shg config set`**: no longer leaks keys between global/local scopes (writes only scope file)
+- **`shg dev --livereload`**: flag name corrected (was `--live-reload`)
+- **`shg bump`**: JSON regex matches quoted keys correctly; uses `existsSync` instead of `try/catch`
+- **`shg run`**: removed dead branch in `resolveRunValues`
+- **`project.ts`**: removed unused `CommandResult` import
+- **`index.ts`**: replaced 16-branch if/else with `COMMAND_REGISTRY` map
+- **`args.ts`**: removed dead `"source"` value flag
+- **All commands**: use shared `requireProjectRoot` (9 files), `emitJson` (7 files)
+- **`shg create`**: fully migrated from `npm`/`npx` to `bun`/`bunx`
+
 ## [2026.4.1] - 2026-06-09
 
 ### Fixed

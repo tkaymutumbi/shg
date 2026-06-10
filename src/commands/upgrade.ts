@@ -1,17 +1,16 @@
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
+import { requireProjectRoot } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runUpgrade(context: CommandContext): Promise<CommandResult> {
-  if (!context.projectRoot) {
-    console.error(chalk.red("Upgrade command requires a Capacitor project root."));
-    return { exitCode: 1 };
-  }
+  const projectRoot = requireProjectRoot(context, "Upgrade");
+  if (!projectRoot) return { exitCode: 1 };
 
   console.log(chalk.cyan("\nChecking Capacitor package versions...\n"));
 
   const lsResult = await runCommand(
-    { label: "bun pm ls", cmd: "bun", args: ["pm", "ls"], cwd: context.projectRoot },
+    { label: "bun pm ls", cmd: "bun", args: ["pm", "ls"], cwd: projectRoot },
     { stdio: "pipe" },
   );
 
@@ -25,7 +24,7 @@ export async function runUpgrade(context: CommandContext): Promise<CommandResult
   if (context.flags.run) {
     console.log(chalk.cyan("\nRunning npx cap upgrade...\n"));
     const upgradeResult = await runCommand(
-      { label: "bunx cap upgrade", cmd: "bunx", args: ["cap", "upgrade"], cwd: context.projectRoot },
+      { label: "bunx cap upgrade", cmd: "bunx", args: ["cap", "upgrade"], cwd: projectRoot },
       { stdio: "inherit" },
     );
 

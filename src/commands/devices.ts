@@ -1,12 +1,13 @@
 import chalk from "chalk";
 import { listAndroidDevices } from "../core/android.js";
+import { emitJson } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDevices(context: CommandContext): Promise<CommandResult> {
   const devices = await listAndroidDevices();
 
   if (context.json || context.flags.json) {
-    console.log(JSON.stringify({ devices }, null, 2));
+    emitJson({ devices });
     return { exitCode: 0 };
   }
 

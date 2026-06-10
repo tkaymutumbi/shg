@@ -47,7 +47,7 @@ export function getLocalConfigPath(projectRoot: string): string {
   return join(projectRoot, ".shgrc.json");
 }
 
-function mergeConfig(base: ShgConfig, override?: Partial<ShgConfig>): ShgConfig {
+export function mergeConfig(base: ShgConfig, override?: Partial<ShgConfig>): ShgConfig {
   if (!override) {
     return base;
   }

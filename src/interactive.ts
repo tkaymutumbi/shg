@@ -13,6 +13,14 @@ import { runCreate } from "./commands/create.js";
 import { runUpgrade } from "./commands/upgrade.js";
 import type { CommandContext } from "./commands/types.js";
 
+export function isCancelled<T>(val: T | symbol): val is symbol {
+  if (p.isCancel(val)) {
+    p.cancel("Cancelled.");
+    return true;
+  }
+  return false;
+}
+
 const CATEGORIES = [
   { value: "dev", label: "Dev Server (Live Reload)", hint: "start dev server + android app" },
   { value: "deploy", label: "Build & Deploy", hint: "smart deploy pipeline" },
@@ -35,10 +43,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
     options: CATEGORIES,
   });
 
-  if (p.isCancel(category)) {
-    p.cancel("Cancelled.");
-    return 130;
-  }
+  if (isCancelled(category)) return 130;
 
   if (category === "dev") {
     const result = await runDev(context);
@@ -57,10 +62,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       ],
     });
 
-    if (p.isCancel(choice)) {
-      p.cancel("Cancelled.");
-      return 130;
-    }
+    if (isCancelled(choice)) return 130;
 
     const flags: Record<string, string | boolean> = { [choice as string]: true };
     const result = await runDeploy({ ...context, flags });
@@ -80,10 +82,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       required: false,
     });
 
-    if (p.isCancel(choice)) {
-      p.cancel("Cancelled.");
-      return 130;
-    }
+    if (isCancelled(choice)) return 130;
 
     const flags: Record<string, string | boolean> = {};
     for (const item of choice as string[]) {
@@ -103,10 +102,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       ],
     });
 
-    if (p.isCancel(variant)) {
-      p.cancel("Cancelled.");
-      return 130;
-    }
+    if (isCancelled(variant)) return 130;
 
     const flags: Record<string, string | boolean> = variant === "release" ? { release: true } : {};
     const result = await runBuild({ ...context, flags });
@@ -120,10 +116,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       placeholder: "Capacitor",
     });
 
-    if (p.isCancel(tag)) {
-      p.cancel("Cancelled.");
-      return 130;
-    }
+    if (isCancelled(tag)) return 130;
 
     const level = await p.select({
       message: "Log level:",
@@ -135,10 +128,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       ],
     });
 
-    if (p.isCancel(level)) {
-      p.cancel("Cancelled.");
-      return 130;
-    }
+    if (isCancelled(level)) return 130;
 
     const flags: Record<string, string | boolean> = {};
     if (tag && tag !== "Capacitor") flags.tag = tag;
@@ -159,10 +149,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       ],
     });
 
-    if (p.isCancel(action)) {
-      p.cancel("Cancelled.");
-      return 130;
-    }
+    if (isCancelled(action)) return 130;
 
     let name: string | symbol | undefined;
     if (action === "add") {
@@ -171,10 +158,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
         placeholder: "@capacitor/camera",
       });
 
-      if (p.isCancel(name)) {
-        p.cancel("Cancelled.");
-        return 130;
-      }
+      if (isCancelled(name)) return 130;
     }
 
     const rest: string[] = [action as string];
@@ -214,10 +198,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       initialValue: false,
     });
 
-    if (p.isCancel(shouldRun)) {
-      p.cancel("Cancelled.");
-      return 130;
-    }
+    if (isCancelled(shouldRun)) return 130;
 
     const flags: Record<string, string | boolean> = {};
     if (shouldRun) flags.run = true;

@@ -4,13 +4,13 @@ import { join } from "node:path";
 import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { hasAndroidPlatform, webDirExists, readWebDir, findAndroidSdkRoot } from "../core/project.js";
+import { hasAndroidPlatform, webDirExists, readWebDir, findAndroidSdkRoot, emitJson } from "../core/project.js";
 import { listAndroidDevices, connectOverWifi } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 const MIN_GRADLE_VERSION = 8;
 
-interface DoctorCheck {
+export interface DoctorCheck {
   id: string;
   title: string;
   status: "pass" | "warn" | "fail";
@@ -19,7 +19,7 @@ interface DoctorCheck {
   safeFix?: () => Promise<void>;
 }
 
-function statusIcon(status: DoctorCheck["status"]): string {
+export function statusIcon(status: DoctorCheck["status"]): string {
   if (status === "pass") return chalk.green("✔");
   if (status === "warn") return chalk.yellow("! ");
   return chalk.red("✘");
@@ -272,21 +272,15 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
   }
 
   if (context.json || context.flags.json) {
-    console.log(
-      JSON.stringify(
-        {
-          checks: checks.map((check) => ({
-            id: check.id,
-            title: check.title,
-            status: check.status,
-            details: check.details,
-            fix: check.fix,
-          })),
-        },
-        null,
-        2,
-      ),
-    );
+    emitJson({
+      checks: checks.map((check) => ({
+        id: check.id,
+        title: check.title,
+        status: check.status,
+        details: check.details,
+        fix: check.fix,
+      })),
+    });
   } else {
     console.log(chalk.cyan("\nSHG Doctor Report\n"));
     for (const check of checks) {

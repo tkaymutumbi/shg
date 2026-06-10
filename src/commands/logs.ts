@@ -1,10 +1,11 @@
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
+import { emitJson } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
-function getFilter(tag?: string, level?: string): string {
+export function getFilter(tag?: string, level?: string): string {
   if (tag) return `${tag}:${level ?? "D"}`;
-  return "Capacitor:D";
+  return `Capacitor:${level ?? "D"}`;
 }
 
 export async function runLogs(context: CommandContext): Promise<CommandResult> {
@@ -13,7 +14,7 @@ export async function runLogs(context: CommandContext): Promise<CommandResult> {
   const filter = getFilter(tag, level);
 
   if (context.json || context.flags.json) {
-    console.log(JSON.stringify({ filter, tag, level }, null, 2));
+    emitJson({ filter, tag, level });
     return { exitCode: 0 };
   }
 

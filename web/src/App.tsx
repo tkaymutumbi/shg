@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, Terminal as TerminalIcon, Zap, Smartphone, Activity, ShieldCheck, Copy, Check, Code, Heart, Download, BookOpen, Sun, Moon } from 'lucide-react';
+import { ExternalLink, Terminal as TerminalIcon, Zap, Smartphone, Activity, ShieldCheck, Copy, Check, Code, Heart, Download, BookOpen, Sun, Moon, Menu, X } from 'lucide-react';
 import Logo from './components/Logo';
 import Terminal from './components/Terminal';
 import Docs from './pages/Docs';
@@ -39,6 +39,8 @@ const ThemeSwitcher = () => {
 };
 
 const LandingPage = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-dark-bg text-dark-text selection:bg-brand-accent selection:text-white transition-colors duration-300">
       {/* Navigation */}
@@ -47,35 +49,69 @@ const LandingPage = () => {
           <div className="flex items-center gap-2">
             <Logo variant="header" className="text-xl" />
           </div>
-          <div className="flex items-center gap-4 sm:gap-6">
+          <div className="hidden sm:flex items-center gap-6">
             <Link to="/docs" className="hover:text-brand-accent transition-colors flex items-center gap-2">
               <BookOpen size={20} />
-              <span className="hidden sm:inline">Docs</span>
+              <span>Docs</span>
             </Link>
             <a href="https://github.com/Diplovee/shg" target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent transition-colors flex items-center gap-2">
               <ExternalLink size={20} />
-              <span className="hidden sm:inline">GitHub</span>
+              <span>GitHub</span>
             </a>
             <ThemeSwitcher />
             <Link to="/docs" className="bg-brand-accent hover:opacity-90 text-white px-4 py-2 rounded-lg font-medium transition-all transform hover:scale-105 shadow-lg shadow-brand-accent/20">
               Get Started
             </Link>
           </div>
+          
+          <button className="sm:hidden p-2" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
+        
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="sm:hidden bg-nav-bg backdrop-blur-md border-b border-border-subtle"
+            >
+              <div className="px-4 py-6 flex flex-col gap-4">
+                <Link to="/docs" className="hover:text-brand-accent transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
+                  <BookOpen size={20} />
+                  <span>Docs</span>
+                </Link>
+                <a href="https://github.com/Diplovee/shg" target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent transition-colors flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
+                  <ExternalLink size={20} />
+                  <span>GitHub</span>
+                </a>
+                <div className="flex items-center justify-between">
+                  <span>Theme</span>
+                  <ThemeSwitcher />
+                </div>
+                <Link to="/docs" className="bg-brand-accent hover:opacity-90 text-white px-4 py-2 rounded-lg font-medium transition-all text-center" onClick={() => setIsMobileMenuOpen(false)}>
+                  Get Started
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* Hero Section */}
-      <header className="pt-20 pb-32 px-4 overflow-hidden">
+      <header className="pt-16 pb-20 px-4 overflow-hidden">
         <div className="max-w-7xl mx-auto text-center relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 bg-gradient-to-r from-brand-primary to-brand-accent bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight mb-6 bg-gradient-to-r from-brand-primary to-brand-accent bg-clip-text text-transparent">
               Capacitor Android development,<br className="hidden md:block" /> simplified.
             </h1>
-            <p className="text-xl md:text-2xl opacity-60 max-w-3xl mx-auto mb-10 leading-relaxed">
+            <p className="text-lg md:text-2xl opacity-60 max-w-3xl mx-auto mb-10 leading-relaxed">
               Interactive & automation-first CLI to streamline your mobile workflow from setup to deployment.
             </p>
           </motion.div>
@@ -220,9 +256,11 @@ const CodeBlock: React.FC<{ label: string; code: string }> = ({ label, code }) =
     <div className="px-4 py-2 border-b border-border-subtle text-xs font-medium opacity-50 bg-dark-bg/50 uppercase tracking-wider text-left">
       {label}
     </div>
-    <div className="p-4 font-mono text-brand-primary flex items-center justify-between">
-      <span>{code}</span>
-      <CopyButton code={code} variant="ghost" />
+    <div className="p-4 font-mono text-brand-primary flex items-center justify-between gap-4 overflow-x-auto">
+      <span className="whitespace-nowrap">{code}</span>
+      <div className="shrink-0">
+        <CopyButton code={code} variant="ghost" />
+      </div>
     </div>
   </div>
 );

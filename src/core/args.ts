@@ -14,7 +14,7 @@ const SHORT_FLAG_MAP: Record<string, string> = {
   v: "version",
 };
 
-const VALUE_FLAGS = new Set(["device", "variant", "flavor", "host", "port", "tag", "level", "to", "source", "platform"]);
+const VALUE_FLAGS = new Set(["device", "variant", "flavor", "host", "port", "tag", "level", "to", "platform"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const flags: Record<string, string | boolean> = {};

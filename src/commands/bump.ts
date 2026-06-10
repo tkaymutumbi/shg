@@ -1,6 +1,7 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
+import { requireProjectRoot, emitJson, CONFIG_FILES } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 interface VersionInfo {
@@ -8,7 +9,7 @@ interface VersionInfo {
   versionCode: number;
 }
 
-function parseVersion(input: string): VersionInfo {
+export function parseVersion(input: string): VersionInfo {
   const clean = input.replace(/^v/, "");
   const parts = clean.split(".");
   const major = parseInt(parts[0] ?? "1", 10);
@@ -42,9 +43,9 @@ function readCurrentVersion(capacitorConfigPath: string): VersionInfo | null {
 function updateCapacitorConfig(path: string, version: VersionInfo): boolean {
   try {
     let content = readFileSync(path, "utf8");
-    content = content.replace(/version\s*[:=]\s*["'][^"']+["']/, `version: "${version.versionName}"`);
-    content = content.replace(/versionName\s*[:=]\s*["'][^"']+["']/, `versionName: "${version.versionName}"`);
-    content = content.replace(/versionCode\s*[:=]\s*\d+/, `versionCode: ${version.versionCode}`);
+    content = content.replace(/["']?version["']?\s*[:=]\s*["'][^"']+["']/, `"version": "${version.versionName}"`);
+    content = content.replace(/["']?versionName["']?\s*[:=]\s*["'][^"']+["']/, `"versionName": "${version.versionName}"`);
+    content = content.replace(/["']?versionCode["']?\s*[:=]\s*\d+/, `"versionCode": ${version.versionCode}`);
     writeFileSync(path, content, "utf8");
     return true;
   } catch {
@@ -65,10 +66,8 @@ function updateBuildGradle(path: string, version: VersionInfo): boolean {
 }
 
 export async function runBump(context: CommandContext): Promise<CommandResult> {
-  if (!context.projectRoot) {
-    console.error(chalk.red("Bump command requires a Capacitor project root."));
-    return { exitCode: 1 };
-  }
+  const projectRoot = requireProjectRoot(context, "Bump");
+  if (!projectRoot) return { exitCode: 1 };
 
   const rawVersion = typeof context.flags.to === "string" ? context.flags.to : undefined;
 
@@ -77,11 +76,9 @@ export async function runBump(context: CommandContext): Promise<CommandResult> {
   if (rawVersion) {
     version = parseVersion(rawVersion);
   } else {
-    const capacitorConfig = ["capacitor.config.ts", "capacitor.config.js", "capacitor.config.json"]
-      .map((f) => join(context.projectRoot!, f))
-      .find((f) => {
-        try { readFileSync(f, "utf8"); return true; } catch { return false; }
-      });
+    const capacitorConfig = CONFIG_FILES
+      .map((f) => join(projectRoot, f))
+      .find((f) => existsSync(f));
 
     if (!capacitorConfig) {
       console.error(chalk.red("No capacitor.config.* file found to read current version."));
@@ -105,17 +102,16 @@ export async function runBump(context: CommandContext): Promise<CommandResult> {
 
   let updated = false;
 
-  for (const configFile of ["capacitor.config.ts", "capacitor.config.js", "capacitor.config.json"]) {
-    const configPath = join(context.projectRoot, configFile);
-    try { readFileSync(configPath, "utf8"); } catch { continue; }
+  for (const configFile of CONFIG_FILES) {
+    const configPath = join(projectRoot, configFile);
+    if (!existsSync(configPath)) continue;
     if (updateCapacitorConfig(configPath, version)) {
       console.log(chalk.green(`  Updated ${configFile}`));
       updated = true;
     }
   }
 
-  const buildGradlePath = join(context.projectRoot, "android", "app", "build.gradle");
-  try { readFileSync(buildGradlePath, "utf8"); } catch {}
+  const buildGradlePath = join(projectRoot, "android", "app", "build.gradle");
   if (updateBuildGradle(buildGradlePath, version)) {
     console.log(chalk.green(`  Updated android/app/build.gradle`));
     updated = true;
@@ -127,7 +123,7 @@ export async function runBump(context: CommandContext): Promise<CommandResult> {
   }
 
   if (context.json || context.flags.json) {
-    console.log(JSON.stringify({ version: version.versionName, versionCode: version.versionCode }, null, 2));
+    emitJson({ version: version.versionName, versionCode: version.versionCode });
   }
 
   console.log(chalk.green("\nVersion bump complete."));
