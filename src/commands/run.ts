@@ -78,34 +78,79 @@ function findBuiltApk(projectRoot: string, variant: string, flavor: string): str
   return matches.sort((a, b) => b.length - a.length)[0] ?? files.sort((a, b) => b.length - a.length)[0];
 }
 
+function formatDeviceList(devices: { id: string; status: string; model?: string }[]): string {
+  return devices.length > 0
+    ? devices.map((d) => `${d.id} (${d.status}${d.model ? `, ${d.model}` : ""})`).join(", ")
+    : "none";
+}
+
 export async function runRun(context: CommandContext, options: RunOptions = {}): Promise<CommandResult> {
   const projectRoot = requireProjectRoot(context, "Run");
   if (!projectRoot) return { exitCode: 1 };
 
   const { device, variant, flavor } = resolveRunValues(projectRoot, context);
 
-  const devices = await listAndroidDevices();
-  const deviceConnected = !device || devices.some((d) => d.id === device);
-  if (!deviceConnected && devices.length === 0) {
-    const savedIp = loadWifiIp();
-    const shouldReconnect = await p.confirm({
-      message: `No device connected${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try to connect wirelessly?`,
-      initialValue: true,
-    });
-    if (shouldReconnect) {
-      const ok = await connectOverWifi();
-      if (!ok) {
-        console.error(chalk.red("No device available. Connect a device and retry."));
-        return { exitCode: 1 };
+  let devices = await listAndroidDevices();
+  let readyDevices = devices.filter((d) => d.status === "device");
+  let resolvedTarget = device;
+
+  const requestedDeviceConnected = resolvedTarget
+    ? readyDevices.some((d) => d.id === resolvedTarget)
+    : false;
+
+  if (resolvedTarget && !requestedDeviceConnected) {
+    if (readyDevices.length === 0) {
+      const savedIp = loadWifiIp();
+      const shouldReconnect = await p.confirm({
+        message: `Target device "${resolvedTarget}" is not connected${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try WiFi reconnect?`,
+        initialValue: true,
+      });
+
+      if (shouldReconnect) {
+        const ok = await connectOverWifi();
+        if (ok) {
+          devices = await listAndroidDevices();
+          readyDevices = devices.filter((d) => d.status === "device");
+        }
       }
-    } else {
-      console.error(chalk.red("No device available. Connect a device and retry."));
+    }
+
+    if (!readyDevices.some((d) => d.id === resolvedTarget)) {
+      console.error(chalk.red(`Target device "${resolvedTarget}" not found.`));
+      console.log(chalk.dim(`Available: ${formatDeviceList(devices)}`));
       return { exitCode: 1 };
     }
-  } else if (!deviceConnected) {
-    console.error(chalk.red(`Target device "${device}" not found.`));
-    console.log(chalk.dim(`Available: ${devices.map((d) => d.id).join(", ") || "none"}`));
-    return { exitCode: 1 };
+  }
+
+  if (!resolvedTarget && readyDevices.length === 0) {
+    const savedIp = loadWifiIp();
+    const shouldReconnect = await p.confirm({
+      message: `No ready Android device found${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try to connect over WiFi?`,
+      initialValue: true,
+    });
+
+    if (shouldReconnect) {
+      const ok = await connectOverWifi();
+      if (ok) {
+        devices = await listAndroidDevices();
+        readyDevices = devices.filter((d) => d.status === "device");
+      }
+    }
+
+    if (readyDevices.length === 0) {
+      console.error(chalk.red("No Android device is ready for deployment."));
+      if (devices.length > 0) {
+        console.log(chalk.dim(`ADB sees: ${formatDeviceList(devices)}`));
+        console.log(chalk.yellow("Tip: authorize the phone on-device, reconnect USB, or run `adb connect <phone-ip>:5555`."));
+      } else {
+        console.log(chalk.yellow("Tip: connect a phone with USB debugging enabled, or use WiFi ADB with `adb connect <phone-ip>:5555`."));
+      }
+      return { exitCode: 1 };
+    }
+  }
+
+  if (!resolvedTarget && readyDevices.length === 1) {
+    resolvedTarget = readyDevices[0].id;
   }
 
   if (!options.skipSync && context.config.autoSyncBeforeRun) {
@@ -125,8 +170,8 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   }
 
   const args = ["cap", "run", "android"];
-  if (device) {
-    args.push("--target", device);
+  if (resolvedTarget) {
+    args.push("--target", resolvedTarget);
   }
   if (variant) {
     args.push("--configuration", variant);
@@ -146,13 +191,13 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   );
 
   if (!result.success) {
-    const isWifiDevice = device && device.includes(":");
-    if (isWifiDevice) {
+    const wifiTarget = resolvedTarget?.includes(":") ? resolvedTarget : undefined;
+    if (wifiTarget) {
       const deviceCheck = await runCommand(
         { label: "adb devices", cmd: "adb", args: ["devices", "-l"] },
         { stdio: "pipe" },
       );
-      const deviceGone = !deviceCheck.stdout.includes(device);
+      const deviceGone = !deviceCheck.stdout.includes(wifiTarget);
 
       if (deviceGone) {
         console.log(chalk.yellow("\nWiFi connection dropped during deploy. Reconnecting...\n"));
@@ -165,7 +210,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
               {
                 label: "adb shell am start",
                 cmd: "adb",
-                args: ["-s", device, "shell", "am", "start", "-n", launcherComponent],
+                args: ["-s", wifiTarget, "shell", "am", "start", "-n", launcherComponent],
                 cwd: projectRoot,
               },
               { stdio: "inherit" },
@@ -173,7 +218,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
             if (relaunchResult.success) {
               console.log(chalk.green("App re-launched successfully after reconnection.\n"));
-              saveState(projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
+              saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
               return { exitCode: 0 };
             }
           }
@@ -189,7 +234,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
             {
               label: "adb install -r",
               cmd: "adb",
-              args: ["-s", device, "install", "-r", "-d", apkPath],
+              args: ["-s", wifiTarget, "install", "-r", "-d", apkPath],
               cwd: projectRoot,
             },
             { stdio: "inherit" },
@@ -197,7 +242,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
           if (reinstallResult.success) {
             console.log(chalk.green("App re-installed and will launch automatically.\n"));
-            saveState(projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
+            saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
             return { exitCode: 0 };
           }
         }
@@ -208,7 +253,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   }
 
   saveState(projectRoot, {
-    lastDeviceId: device,
+    lastDeviceId: resolvedTarget,
     lastVariant: variant,
     lastFlavor: flavor,
   });
