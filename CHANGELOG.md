@@ -4,6 +4,19 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.4.3] - 2026-06-11
+
+### Added
+- **Interactive dev connection prompt**: `shg` → `Dev Server` now asks for Auto / WiFi / USB-Emulator mode, plus port and optional WiFi host
+- **Doctor environment guards**: detects Capacitor major-version mismatches and Android Java target vs installed JDK mismatches before long Gradle runs
+
+### Fixed
+- **`shg build --flavor`**: now generates the correct Gradle `assemble<Flavor><Variant>` task
+- **`shg build --release --variant ...`**: now rejects conflicting combinations instead of silently ignoring `--variant`
+- **`shg run`**: WiFi reconnect now relaunches with `adb shell am start` and discovers APK outputs dynamically instead of relying on a hard-coded debug/release path
+- **`shg dev --wifi`**: never passes `--host=undefined`; falls back safely when LAN IP detection fails
+- **`shg deploy`**: now forwards `--json`, `--verbose`, and `--fix` into the doctor phase
+
 ## [2026.4.2] - 2026-06-10
 
 ### Added

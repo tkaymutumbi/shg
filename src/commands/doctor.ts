@@ -4,7 +4,7 @@ import { join } from "node:path";
 import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { hasAndroidPlatform, webDirExists, readWebDir, findAndroidSdkRoot, emitJson } from "../core/project.js";
+import { hasAndroidPlatform, webDirExists, readWebDir, findAndroidSdkRoot, emitJson, getCapacitorDependencyMajorMismatch, getCapacitorDependencyVersions, readAndroidJavaTarget } from "../core/project.js";
 import { listAndroidDevices, connectOverWifi } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
@@ -43,6 +43,14 @@ async function checkCommandVersion(cmd: string, args: string[], title: string, f
     details: `${cmd} not available`,
     fix,
   };
+}
+
+function parseJavaMajor(versionOutput: string): number | undefined {
+  const quoted = versionOutput.match(/version\s+"(\d+)(?:\.(\d+))?/);
+  if (quoted) return Number.parseInt(quoted[1], 10);
+
+  const fallback = versionOutput.match(/(?:openjdk|java)\s+(\d+)/i);
+  return fallback ? Number.parseInt(fallback[1], 10) : undefined;
 }
 
 async function checkGradle(context: CommandContext): Promise<DoctorCheck> {
@@ -116,14 +124,13 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
     await checkCommandVersion("bun", ["--version"], "bun", "Install bun and retry."),
   );
 
-  checks.push(
-    await checkCommandVersion(
-      "java",
-      ["-version"],
-      "Java",
-      "Install JDK and ensure `java` is on PATH.",
-    ),
+  const javaCheck = await checkCommandVersion(
+    "java",
+    ["-version"],
+    "Java",
+    "Install JDK and ensure `java` is on PATH.",
   );
+  checks.push(javaCheck);
 
   const adbCheck = await checkCommandVersion(
     "adb",
@@ -236,8 +243,18 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
       );
 
       if (lsResult.success) {
-        installCheck.status = "pass";
-        installCheck.details = "@capacitor/core and @capacitor/cli detected";
+        const versions = getCapacitorDependencyVersions(context.projectRoot);
+        const mismatch = getCapacitorDependencyMajorMismatch(context.projectRoot);
+        if (mismatch) {
+          installCheck.status = "fail";
+          installCheck.details = `Capacitor package majors do not match: ${Object.entries(mismatch.versions).map(([name, version]) => `${name}=${version}`).join(", ")}`;
+          installCheck.fix = "Align @capacitor/core, @capacitor/cli, and platform packages to the same major version, then run `bun install && bunx cap sync android`.";
+        } else {
+          installCheck.status = "pass";
+          installCheck.details = Object.keys(versions).length > 0
+            ? Object.entries(versions).map(([name, version]) => `${name}=${version}`).join(", ")
+            : "@capacitor packages detected";
+        }
       } else {
         installCheck.status = "warn";
         installCheck.details = "Capacitor deps missing or not installed";
@@ -254,6 +271,20 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
         };
       }
       checks.push(installCheck);
+
+      const javaMajor = parseJavaMajor(javaCheck.details);
+      const javaTarget = readAndroidJavaTarget(context.projectRoot);
+      if (javaMajor && javaTarget) {
+        checks.push({
+          id: "android-java-target",
+          title: "Android Java target",
+          status: javaTarget > javaMajor ? "fail" : "pass",
+          details: `Project targets Java ${javaTarget}; current JDK is Java ${javaMajor}`,
+          fix: javaTarget > javaMajor
+            ? `Install JDK ${javaTarget}+ or lower the Android compile target before running shg dev/build.`
+            : undefined,
+        });
+      }
     }
   }
 

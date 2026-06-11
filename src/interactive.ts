@@ -46,7 +46,44 @@ export async function runInteractive(context: CommandContext): Promise<number> {
   if (isCancelled(category)) return 130;
 
   if (category === "dev") {
-    const result = await runDev(context);
+    const connection = await p.select({
+      message: "How do you want to run dev?",
+      options: [
+        { value: "auto", label: "Auto", hint: "Use current defaults and prompt later if needed" },
+        { value: "wifi", label: "WiFi", hint: "Connect wirelessly and use live reload over LAN" },
+        { value: "usb", label: "USB / Emulator", hint: "Use a connected device or running emulator" },
+      ],
+    });
+
+    if (isCancelled(connection)) return 130;
+
+    const port = await p.text({
+      message: "Dev server port:",
+      placeholder: "5173",
+      initialValue: typeof context.flags.port === "string" ? context.flags.port : "5173",
+    });
+
+    if (isCancelled(port)) return 130;
+
+    const flags: Record<string, string | boolean> = { ...context.flags };
+    if (connection === "wifi") {
+      flags.wifi = true;
+
+      const host = await p.text({
+        message: "Host for device access?",
+        placeholder: "auto-detect",
+        initialValue: typeof context.flags.host === "string" ? context.flags.host : "",
+      });
+
+      if (isCancelled(host)) return 130;
+      if (host.trim()) flags.host = host.trim();
+    }
+
+    if (typeof port === "string" && port.trim()) {
+      flags.port = port.trim();
+    }
+
+    const result = await runDev({ ...context, flags });
     p.outro(result.exitCode === 0 ? chalk.cyan("SHG done.") : chalk.red("SHG ended with errors."));
     return result.exitCode;
   }

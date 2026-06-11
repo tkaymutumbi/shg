@@ -66,6 +66,69 @@ export function webDirExists(projectRoot: string): boolean {
   return existsSync(join(projectRoot, webDir));
 }
 
+function readPackageJson(projectRoot: string): Record<string, any> | undefined {
+  const packageJsonPath = join(projectRoot, "package.json");
+  if (!existsSync(packageJsonPath)) return undefined;
+
+  try {
+    return JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+function readDependencyVersion(pkg: Record<string, any>, name: string): string | undefined {
+  const deps = pkg.dependencies ?? {};
+  const devDeps = pkg.devDependencies ?? {};
+  const value = deps[name] ?? devDeps[name];
+  return typeof value === "string" ? value : undefined;
+}
+
+function parseMajor(version: string): number | undefined {
+  const match = version.match(/(\d+)/);
+  return match ? Number.parseInt(match[1], 10) : undefined;
+}
+
+export function getCapacitorDependencyVersions(projectRoot: string): Record<string, string> {
+  const pkg = readPackageJson(projectRoot);
+  if (!pkg) return {};
+
+  const names = ["@capacitor/core", "@capacitor/cli", "@capacitor/android", "@capacitor/ios"];
+  return Object.fromEntries(
+    names
+      .map((name) => [name, readDependencyVersion(pkg, name)] as const)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  );
+}
+
+export function getCapacitorDependencyMajorMismatch(projectRoot: string): { majors: number[]; versions: Record<string, string> } | undefined {
+  const versions = getCapacitorDependencyVersions(projectRoot);
+  const majors = Object.values(versions)
+    .map(parseMajor)
+    .filter((major): major is number => typeof major === "number");
+
+  if (majors.length < 2) return undefined;
+  return new Set(majors).size > 1 ? { majors: [...new Set(majors)].sort((a, b) => a - b), versions } : undefined;
+}
+
+export function readAndroidJavaTarget(projectRoot: string): number | undefined {
+  const candidateFiles = [
+    join(projectRoot, "android", "app", "capacitor.build.gradle"),
+    join(projectRoot, "android", "app", "build.gradle"),
+  ];
+
+  for (const file of candidateFiles) {
+    if (!existsSync(file)) continue;
+    try {
+      const raw = readFileSync(file, "utf8");
+      const match = raw.match(/JavaVersion\.VERSION_(\d+)/);
+      if (match) return Number.parseInt(match[1], 10);
+    } catch {}
+  }
+
+  return undefined;
+}
+
 export function hasValidAndroidSdk(): boolean {
   const sdkRoot = process.env.ANDROID_SDK_ROOT ?? process.env.ANDROID_HOME;
   if (!sdkRoot) return false;

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { requireProjectRoot, hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice } from "../core/project.js";
+import { requireProjectRoot, hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice, getCapacitorDependencyMajorMismatch } from "../core/project.js";
 import { ensureAdb, connectOverWifi, getLanIp } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
@@ -11,8 +11,16 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   const projectRoot = requireProjectRoot(context, "Dev");
   if (!projectRoot) return { exitCode: 1 };
 
+  const mismatch = getCapacitorDependencyMajorMismatch(projectRoot);
+  if (mismatch) {
+    console.error(chalk.red("Capacitor package major versions do not match."));
+    console.log(chalk.yellow(`  ${Object.entries(mismatch.versions).map(([name, version]) => `${name}=${version}`).join(", ")}`));
+    console.log(chalk.dim("  Fix: align Capacitor packages to the same major version, then run `bun install && bunx cap sync android`."));
+    return { exitCode: 1 };
+  }
+
   const wifi = Boolean(context.flags.wifi);
-  let host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? getLanIp() : "localhost");
+  let host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? (getLanIp() ?? "0.0.0.0") : "localhost");
   const port = typeof context.flags.port === "string" ? context.flags.port : "5173";
 
   const adbOk = await ensureAdb();
@@ -121,8 +129,8 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     }
   }
 
-  if (usingWifi && !context.flags.host && host === "localhost") {
-    host = getLanIp();
+  if (usingWifi && !context.flags.host && (host === "localhost" || host === "0.0.0.0")) {
+    host = getLanIp() ?? "0.0.0.0";
   }
 
   if (usingWifi) {
@@ -133,9 +141,9 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
 
   const capResult = await runCommand(
     {
-      label: "bunx cap run android --livereload",
+      label: "bunx cap run android --live-reload",
       cmd: "bunx",
-      args: ["cap", "run", "android", "--livereload", `--host=${host}`, `--port=${port}`],
+      args: ["cap", "run", "android", "--live-reload", `--host=${host}`, `--port=${port}`],
       cwd: projectRoot,
     },
     { verbose: context.verbose, stdio: "inherit" },

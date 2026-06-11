@@ -3,15 +3,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-let mockSelectValue = "dev";
+let mockSelectValues = ["dev"];
 let mockMultiselectValue = ["install"];
-let mockTextValue = "test-input";
+let mockTextValues = ["test-input"];
 let mockConfirmValue = true;
 
 mock.module("@clack/prompts", () => ({
-  select: async () => mockSelectValue,
+  select: async () => mockSelectValues.shift() ?? "dev",
   multiselect: async () => mockMultiselectValue,
-  text: async () => mockTextValue,
+  text: async () => mockTextValues.shift() ?? "test-input",
   confirm: async () => mockConfirmValue,
   isCancel: () => false,
   cancel: () => {},
@@ -48,14 +48,15 @@ function makeContext(overrides: Record<string, any> = {}) {
 
 describe("runInteractive", () => {
   test("dev category returns 0", async () => {
-    mockSelectValue = "dev";
+    mockSelectValues = ["dev", "auto"];
+    mockTextValues = ["5173"];
     const code = await runInteractive(makeContext());
     expect(code).toBe(1);
   });
 
   test("deploy category defaults to all steps", async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), "shg-test-"));
-    mockSelectValue = "deploy";
+    mockSelectValues = ["deploy", "all"];
     mockMultiselectValue = ["all"];
     const code = await runInteractive(makeContext({ projectRoot: tmpDir }));
     expect(code).toBe(0);
@@ -63,45 +64,45 @@ describe("runInteractive", () => {
   });
 
   test("setup category runs selected steps", async () => {
-    mockSelectValue = "setup";
+    mockSelectValues = ["setup"];
     mockMultiselectValue = ["install"];
     const code = await runInteractive(makeContext());
     expect(code).toBe(0);
   });
 
   test("build category debug variant", async () => {
-    mockSelectValue = "build";
+    mockSelectValues = ["build", "debug"];
     const code = await runInteractive(makeContext());
     expect(code).toBe(0);
   });
 
   test("assets category", async () => {
-    mockSelectValue = "assets";
+    mockSelectValues = ["assets"];
     const code = await runInteractive(makeContext());
     expect(code).toBe(0);
   });
 
   test("open category", async () => {
-    mockSelectValue = "open";
+    mockSelectValues = ["open"];
     const code = await runInteractive(makeContext());
     expect(code).toBe(0);
   });
 
   test("clean category", async () => {
-    mockSelectValue = "clean";
+    mockSelectValues = ["clean"];
     const code = await runInteractive(makeContext());
     expect(code).toBe(0);
   });
 
   test("upgrade category without run", async () => {
-    mockSelectValue = "upgrade";
+    mockSelectValues = ["upgrade"];
     mockConfirmValue = false;
     const code = await runInteractive(makeContext());
     expect(code).toBe(0);
   });
 
   test("upgrade category with run", async () => {
-    mockSelectValue = "upgrade";
+    mockSelectValues = ["upgrade"];
     mockConfirmValue = true;
     const code = await runInteractive(makeContext());
     expect(code).toBe(0);

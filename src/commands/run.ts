@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
@@ -23,6 +24,58 @@ function resolveRunValues(projectRoot: string, context: CommandContext) {
     variant: getStringFlag(context.flags, "variant") || context.config.defaultVariant || state.lastVariant || "debug",
     flavor: getStringFlag(context.flags, "flavor") || context.config.defaultFlavor || state.lastFlavor || "",
   };
+}
+
+function normalizeActivityName(appId: string, activityName: string): string {
+  if (activityName.startsWith(".")) return `${appId}${activityName}`;
+  if (!activityName.includes(".")) return `${appId}.${activityName}`;
+  return activityName;
+}
+
+function readLauncherComponent(projectRoot: string): string | undefined {
+  const manifestPath = join(projectRoot, "android", "app", "src", "main", "AndroidManifest.xml");
+  if (!existsSync(manifestPath)) return undefined;
+
+  const appId = readAppId(projectRoot);
+  if (!appId) return undefined;
+
+  const manifest = readFileSync(manifestPath, "utf8");
+  const launcherBlock = manifest.match(/<(activity|activity-alias)\b[\s\S]*?<intent-filter>[\s\S]*?android\.intent\.action\.MAIN[\s\S]*?android\.intent\.category\.LAUNCHER[\s\S]*?<\/intent-filter>[\s\S]*?<\/\1>/);
+  const activityName = launcherBlock?.[0].match(/android:name\s*=\s*["']([^"']+)["']/)?.[1];
+  if (!activityName) return undefined;
+
+  return `${appId}/${normalizeActivityName(appId, activityName)}`;
+}
+
+function findBuiltApk(projectRoot: string, variant: string, flavor: string): string | undefined {
+  const apkRoot = join(projectRoot, "android", "app", "build", "outputs", "apk");
+  if (!existsSync(apkRoot)) return undefined;
+
+  const files: string[] = [];
+  const stack = [apkRoot];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const fullPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith(".apk")) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  const normalizedFlavor = flavor.toLowerCase();
+  const normalizedVariant = variant.toLowerCase();
+  const matches = files.filter((file) => {
+    const normalizedPath = file.toLowerCase();
+    return normalizedPath.includes(normalizedVariant)
+      && (!normalizedFlavor || normalizedPath.includes(normalizedFlavor));
+  });
+
+  return matches.sort((a, b) => b.length - a.length)[0] ?? files.sort((a, b) => b.length - a.length)[0];
 }
 
 export async function runRun(context: CommandContext, options: RunOptions = {}): Promise<CommandResult> {
@@ -105,34 +158,30 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
         console.log(chalk.yellow("\nWiFi connection dropped during deploy. Reconnecting...\n"));
         const reconnected = await connectOverWifi();
         if (reconnected) {
-          const apkPath = join(
-            projectRoot,
-            "android", "app", "build", "outputs", "apk",
-            variant === "release" ? "release" : "debug",
-            `app-${variant === "release" ? "release" : "debug"}.apk`,
-          );
+          const launcherComponent = readLauncherComponent(projectRoot);
+          if (launcherComponent) {
+            console.log(chalk.dim("App was already installed. Re-launching...\n"));
+            const relaunchResult = await runCommand(
+              {
+                label: "adb shell am start",
+                cmd: "adb",
+                args: ["-s", device, "shell", "am", "start", "-n", launcherComponent],
+                cwd: projectRoot,
+              },
+              { stdio: "inherit" },
+            );
 
-          const appId = readAppId(projectRoot);
-          if (!appId) {
-            console.error(chalk.red("Could not determine app package name from capacitor config."));
-            return { exitCode: 1 };
+            if (relaunchResult.success) {
+              console.log(chalk.green("App re-launched successfully after reconnection.\n"));
+              saveState(projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
+              return { exitCode: 0 };
+            }
           }
 
-          console.log(chalk.dim("App was already installed. Re-launching...\n"));
-          const relaunchResult = await runCommand(
-            {
-              label: "adb install and launch",
-              cmd: "adb",
-              args: ["-s", device, "shell", "monkey", "-p", appId, "1"],
-              cwd: projectRoot,
-            },
-            { stdio: "inherit" },
-          );
-
-          if (relaunchResult.success) {
-            console.log(chalk.green("App re-launched successfully after reconnection.\n"));
-            saveState(projectRoot, { lastDeviceId: device, lastVariant: variant, lastFlavor: flavor });
-            return { exitCode: 0 };
+          const apkPath = findBuiltApk(projectRoot, variant, flavor);
+          if (!apkPath) {
+            console.error(chalk.red("Could not find a built APK to reinstall after reconnecting."));
+            return { exitCode: 1 };
           }
 
           console.log(chalk.yellow("Could not re-launch. Trying re-install...\n"));

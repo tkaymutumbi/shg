@@ -12,7 +12,13 @@ export async function runBuild(context: CommandContext): Promise<CommandResult> 
   if (!projectRoot) return { exitCode: 1 };
 
   const release = Boolean(context.flags.release);
-  const variant = release ? "release" : (typeof context.flags.variant === "string" ? context.flags.variant : "debug");
+  const variantFlag = typeof context.flags.variant === "string" ? context.flags.variant : undefined;
+  if (release && variantFlag && variantFlag !== "release") {
+    console.error(chalk.red('Conflicting flags: --release cannot be combined with --variant values other than "release".'));
+    return { exitCode: 1 };
+  }
+
+  const variant = variantFlag ?? (release ? "release" : "debug");
   const flavor = typeof context.flags.flavor === "string" ? context.flags.flavor : undefined;
 
   if (!context.flags["no-sync"]) {
@@ -41,7 +47,9 @@ export async function runBuild(context: CommandContext): Promise<CommandResult> 
 
   const androidDir = `${projectRoot}/android`;
   const gradlew = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-  const task = flavor ? `${flavor}${capitalize(variant)}` : `assemble${capitalize(variant)}`;
+  const task = flavor
+    ? `assemble${capitalize(flavor)}${capitalize(variant)}`
+    : `assemble${capitalize(variant)}`;
 
   console.log(chalk.cyan(`\nBuilding Android ${variant} APK...\n`));
 

@@ -35,12 +35,13 @@ The project also includes a [documentation website](web/) (React + Vite) with fu
 - **Interactive TUI** — Launch `shg` with no arguments to get a menu-driven interface
 - **Live Reload** — Start a dev server and Android app together with `shg dev`
 - **WiFi Debugging** — Run `shg dev --wifi` to deploy and hot-reload wirelessly
+- **Interactive Dev Prompting** — Pick Auto, WiFi, or USB/Emulator from the interactive dev flow
 - **Auto-Install adb** — Downloads platform-tools automatically if adb is missing
 - **Smart Deploy** — Build → sync → run in one command with failure safety
 - **Project Setup** — Install Capacitor, init, update, and add the Android platform
 - **Build APK/AAB** — Debug or release builds via Gradle, no Android Studio needed
 - **Plugin Management** — Add, list, and sync Capacitor plugins
-- **Diagnostics** — Check Node, Java, adb, Android SDK, Gradle, and Capacitor deps
+- **Diagnostics** — Check Node, Java, adb, Android SDK, Gradle, Capacitor deps, and Java target mismatches
 - **Device Management** — List ADB devices with model info
 - **Logcat Viewer** — Tail filtered Android logs with `shg logs`
 - **Asset Generation** — Generate icons and splash screens via capacitor-assets
@@ -108,7 +109,7 @@ Running `shg` with no arguments opens the interactive TUI:
 └─────────────────────────────────────────────┘
 ```
 
-Each selection walks you through the necessary prompts — no flags to remember.
+Each selection walks you through the necessary prompts — no flags to remember. The Dev flow now lets you choose Auto, WiFi, or USB/Emulator mode and set the port/host interactively.
 
 ## Command Reference
 
@@ -118,7 +119,7 @@ Start a live-reload dev server and launch the Android app. Auto-installs `adb` i
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--host` | `localhost` | Dev server host |
+| `--host` | `localhost`/auto | Dev server host |
 | `--port` | `5173` | Dev server port |
 | `--wifi` | — | Connect to device over WiFi instead of USB |
 | `--skip-build` | — | Skip auto-build if web assets directory is missing |
@@ -136,7 +137,7 @@ shg dev
 shg dev --wifi
 ```
 
-The device IP is auto-detected. If no device is found, you'll be prompted to enter the IP manually.
+The device IP is auto-detected. If LAN IP detection fails, SHG now falls back safely instead of passing an invalid host. If no device is found, you'll be prompted to enter the IP manually.
 
 **Custom dev server:**
 
@@ -148,7 +149,7 @@ shg dev --host 0.0.0.0 --port 5173
 
 ### `shg doctor`
 
-Run environment and project diagnostics.
+Run environment and project diagnostics, including Capacitor package-major alignment and Android Java target vs installed JDK checks.
 
 | Flag | Description |
 |------|-------------|

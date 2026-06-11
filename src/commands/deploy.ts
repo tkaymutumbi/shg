@@ -29,7 +29,12 @@ export async function runDeploy(context: CommandContext): Promise<CommandResult>
   }
 
   if (context.config.doctor.autoRunBeforeDeploy) {
-    const doctorResult = await runDoctor({ ...context, flags: {} });
+    const doctorFlags: Record<string, string | boolean> = {};
+    if (context.flags.json || context.json) doctorFlags.json = true;
+    if (context.flags.verbose || context.verbose) doctorFlags.verbose = true;
+    if (context.flags.fix) doctorFlags.fix = true;
+
+    const doctorResult = await runDoctor({ ...context, flags: doctorFlags });
     if (doctorResult.exitCode !== 0) {
       console.error(chalk.red("Doctor checks failed. Aborting deploy."));
       return doctorResult;
