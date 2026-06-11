@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import * as p from "@clack/prompts";
@@ -40,6 +41,24 @@ async function detectDevServerPort(host: string, preferredPort: string, explicit
   }
 
   return preferredPort;
+}
+
+async function waitForDevServer(host: string, port: string, timeoutMs = 20000): Promise<boolean> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (await canReachDevServer(host, Number.parseInt(port, 10))) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return false;
+}
+
+function startDevServer(projectRoot: string, bindHost: string, port: string) {
+  return spawn("bun", ["run", "dev", "--", "--host", bindHost, "--port", port, "--strictPort"], {
+    cwd: projectRoot,
+    stdio: "inherit",
+  });
 }
 
 export async function runDev(context: CommandContext): Promise<CommandResult> {
@@ -169,16 +188,44 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     host = getLanIp() ?? "0.0.0.0";
   }
 
-  if (usingWifi) {
-    const detectedPort = await detectDevServerPort(host, port, explicitPort);
-    if (detectedPort !== port) {
-      console.log(chalk.yellow(`  Detected running dev server on port ${detectedPort}; using it instead of ${port}.`));
-      port = detectedPort;
+  let startedDevServer = false;
+  let devServerProcess: ReturnType<typeof startDevServer> | undefined;
+
+  const detectedPort = await detectDevServerPort(host, port, explicitPort);
+  if (detectedPort !== port) {
+    console.log(chalk.yellow(`  Detected running dev server on port ${detectedPort}; using it instead of ${port}.`));
+    port = detectedPort;
+  }
+
+  const serverReachable = await canReachDevServer(host, Number.parseInt(port, 10));
+  if (!serverReachable) {
+    const bindHost = usingWifi ? "0.0.0.0" : host;
+    console.log(chalk.yellow(`  No dev server detected at http://${host}:${port}. Starting one automatically...`));
+    devServerProcess = startDevServer(projectRoot, bindHost, port);
+    startedDevServer = true;
+
+    const ready = await waitForDevServer(host, port);
+    if (!ready) {
+      devServerProcess.kill("SIGTERM");
+      console.error(chalk.red(`Dev server did not become reachable at http://${host}:${port}.`));
+      return { exitCode: 1 };
     }
+  }
+
+  if (usingWifi) {
     console.log(chalk.cyan(`  Dev server will be accessible at http://${host}:${port} on your device\n`));
   }
 
   console.log(chalk.cyan("\nStarting live reload dev server + Android app\n"));
+
+  const cleanup = () => {
+    if (startedDevServer && devServerProcess && !devServerProcess.killed) {
+      devServerProcess.kill("SIGTERM");
+    }
+  };
+  process.once("exit", cleanup);
+  process.once("SIGINT", cleanup);
+  process.once("SIGTERM", cleanup);
 
   const capResult = await runCommand(
     {
@@ -189,6 +236,8 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
     },
     { verbose: context.verbose, stdio: "inherit" },
   );
+
+  cleanup();
 
   if (!capResult.success) {
     console.error(chalk.red("\nnative-run failed. Common causes:"));
