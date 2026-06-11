@@ -7,6 +7,41 @@ import { requireProjectRoot, hasAndroidPlatform, readWebDir, hasValidAndroidSdk,
 import { ensureAdb, connectOverWifi, getLanIp } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
+const COMMON_DEV_PORTS = [5173, 4173, 5174, 4174, 3000, 8080];
+
+async function canReachDevServer(host: string, port: number): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+    const response = await fetch(`http://${host}:${port}/`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return response.ok || response.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+async function detectDevServerPort(host: string, preferredPort: string, explicitPort: boolean): Promise<string> {
+  if (explicitPort) return preferredPort;
+
+  const preferred = Number.parseInt(preferredPort, 10);
+  if (Number.isFinite(preferred) && await canReachDevServer(host, preferred)) {
+    return preferredPort;
+  }
+
+  for (const port of COMMON_DEV_PORTS) {
+    if (port === preferred) continue;
+    if (await canReachDevServer(host, port)) {
+      return String(port);
+    }
+  }
+
+  return preferredPort;
+}
+
 export async function runDev(context: CommandContext): Promise<CommandResult> {
   const projectRoot = requireProjectRoot(context, "Dev");
   if (!projectRoot) return { exitCode: 1 };
@@ -21,7 +56,8 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
 
   const wifi = Boolean(context.flags.wifi);
   let host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? (getLanIp() ?? "0.0.0.0") : "localhost");
-  const port = typeof context.flags.port === "string" ? context.flags.port : "5173";
+  let port = typeof context.flags.port === "string" ? context.flags.port : "5173";
+  const explicitPort = typeof context.flags.port === "string";
 
   const adbOk = await ensureAdb();
   if (!adbOk) {
@@ -134,6 +170,11 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   }
 
   if (usingWifi) {
+    const detectedPort = await detectDevServerPort(host, port, explicitPort);
+    if (detectedPort !== port) {
+      console.log(chalk.yellow(`  Detected running dev server on port ${detectedPort}; using it instead of ${port}.`));
+      port = detectedPort;
+    }
     console.log(chalk.cyan(`  Dev server will be accessible at http://${host}:${port} on your device\n`));
   }
 
