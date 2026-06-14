@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "enabled": true,
+  "preferences": [],
+  "projectFacts": [
+    {
+      "text": "> Task :capacitor-mlkit-barcode-scanning:preBuild UP-TO-DATE > Task :capacitor-mlkit-barcode-scanning:preDebugBuild UP-TO-DATE > Task :capacitor-android:bundle…",
+      "createdAt": "2026-06-11T11:26:17.986Z",
+      "updatedAt": "2026-06-11T11:26:17.986Z",
+      "mentions": 1,
+      "source": "user"
+    },
+    {
+      "text": "okay should on the live wifi, take the url used by the app auto like mine now uses , bun run dev $ vite --host VITE v8.0.16 ready in 2786 ms ➜ Local: http://lo…",
+      "createdAt": "2026-06-11T12:17:41.675Z",
+      "updatedAt": "2026-06-11T12:17:41.675Z",
+      "mentions": 1,
+      "source": "user"
+    }
+  ],
+  "recentDecisions": [
+    {
+      "text": "Test Phase 1 manually like this: - Build flavor fix - Run: `shg build --flavor demo --variant debug` - Expect Gradle to invoke `assembleDemoDebug`, not `demoDe…",
+      "createdAt": "2026-06-11T11:06:18.938Z",
+      "updatedAt": "2026-06-11T11:06:18.938Z",
+      "mentions": 1,
+      "source": "assistant"
+    },
+    {
+      "text": "In `src/interactive.ts`, the `dev` option just does: - `runDev(context)` So behavior is: - if you start interactive **with `--wifi` already in flags**, it will…",
+      "createdAt": "2026-06-11T11:15:34.058Z",
+      "updatedAt": "2026-06-11T11:15:34.058Z",
+      "mentions": 1,
+      "source": "assistant"
+    },
+    {
+      "text": "Interactive - run `shg` - choose **Dev Server** - if no device is connected by USB/emulator, choose **WiFi** when prompted - confirm it proceeds without `undef…",
+      "createdAt": "2026-06-11T11:15:34.058Z",
+      "updatedAt": "2026-06-11T11:15:34.058Z",
+      "mentions": 1,
+      "source": "assistant"
+    },
+    {
+      "text": "Now when you run: - `shg` and choose: - `Dev Server (Live Reload)` you’ll get prompts for: - connection mode: `Auto`, `WiFi`, or `USB / Emulator` - dev server…",
+      "createdAt": "2026-06-11T11:23:26.289Z",
+      "updatedAt": "2026-06-11T11:23:26.289Z",
+      "mentions": 1,
+      "source": "assistant"
+    },
+    {
+      "text": "Choose `Dev Server (Live Reload)` 3.",
+      "createdAt": "2026-06-11T11:23:26.289Z",
+      "updatedAt": "2026-06-11T11:23:26.289Z",
+      "mentions": 1,
+      "source": "assistant"
+    },
+    {
+      "text": "Choose `WiFi` 4.",
+      "createdAt": "2026-06-11T11:23:26.289Z",
+      "updatedAt": "2026-06-11T11:23:26.289Z",
+      "mentions": 1,
+      "source": "assistant"
+    }
+  ],
+  "currentFocus": "commit and push",
+  "lastSourceText": "commit and push\nCommitted and pushed. - Repo: `/home/tk/shg` - Commit: `bcfa560` - Message: `Improve run device preflight and Wi-Fi guidance` Note: I only committed `src/commands/run.ts`. Unrelated local changes like `tsconfig.json` and untracked files were left untouched.",
+  "lastUpdatedAt": "2026-06-11T13:21:00.088Z"
+}

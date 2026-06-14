@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "phases": [
+    {
+      "id": 1,
+      "name": "Inspect run/device flow",
+      "goal": "Understand current device detection and Wi-Fi behavior",
+      "status": "awaiting_review",
+      "todos": [
+        {
+          "id": 1,
+          "text": "Read Android device helper code",
+          "done": true
+        },
+        {
+          "id": 2,
+          "text": "Read run command flow and identify failure points",
+          "done": true
+        }
+      ],
+      "testStatus": "pass",
+      "reviewStatus": "requested",
+      "errorCount": 0,
+      "testNotes": "Inspection-only phase: verified root cause in src/commands/run.ts and current Wi-Fi helper behavior in src/core/android.ts.",
+      "reviewNotes": "Inspection phase complete. Root cause and fix plan identified: handle zero usable devices before calling Capacitor/native-run, trigger Wi-Fi connect flow when appropriate, refresh devices after connect, and use explicit target selection to avoid vague native-run errors."
+    },
+    {
+      "id": 2,
+      "name": "Implement UX improvements",
+      "goal": "Add friendly no-device messaging and better Wi-Fi flow",
+      "status": "awaiting_review",
+      "todos": [
+        {
+          "id": 3,
+          "text": "Patch shg run to avoid vague native-run failure",
+          "done": true
+        },
+        {
+          "id": 4,
+          "text": "Ensure Wi-Fi target/discovery guidance is shown",
+          "done": true
+        }
+      ],
+      "testStatus": "pass",
+      "reviewStatus": "requested",
+      "errorCount": 0,
+      "testNotes": "`bun run typecheck` and `bun run build` pass in /home/tk/shg. Manual invocation of updated source shows the new friendly Wi-Fi prompt before Capacitor/native-run is called when no ready device is connected.",
+      "reviewNotes": "Implemented run preflight fix in src/commands/run.ts. `shg run` now detects zero ready devices correctly, prompts for Wi-Fi connection/reconnect before calling Capacitor, prints friendly guidance when no device is deployable, refreshes devices after Wi-Fi connect, and uses an explicit target when exactly one ready device exists."
+    },
+    {
+      "id": 3,
+      "name": "Verify behavior",
+      "goal": "Run tests/checks for the updated flow",
+      "status": "awaiting_review",
+      "todos": [
+        {
+          "id": 5,
+          "text": "Run typecheck or relevant checks",
+          "done": true
+        },
+        {
+          "id": 6,
+          "text": "Summarize changes and request user review",
+          "done": true
+        }
+      ],
+      "testStatus": "pass",
+      "reviewStatus": "requested",
+      "errorCount": 0,
+      "testNotes": "Ready to commit only the intended change in src/commands/run.ts; unrelated local changes remain uncommitted (tsconfig.json and untracked workspace files). User requested commit/push.",
+      "reviewNotes": "Verification complete. Preparing to commit and push only src/commands/run.ts, leaving unrelated tsconfig.json and local untracked files untouched per minimal-scope change."
+    }
+  ],
+  "nextPhaseId": 4,
+  "nextTodoId": 7,
+  "planTitle": "Improve shg run device errors and Wi-Fi handling",
+  "currentPhaseId": 2,
+  "lastUpdatedAt": "2026-06-11T13:20:30.999Z"
+}
