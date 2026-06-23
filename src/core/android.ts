@@ -39,6 +39,11 @@ export async function listAndroidDevices(): Promise<AndroidDevice[]> {
   return parseAdbDevices(result.stdout);
 }
 
+async function verifyWirelessDevice(targetId: string): Promise<boolean> {
+  const devices = await listAndroidDevices();
+  return devices.some((device) => device.id === targetId && device.status === "device");
+}
+
 function getPlatformToolsUrl(): string {
   const platform = process.platform;
   const arch = process.arch;
@@ -224,15 +229,17 @@ export async function connectOverWifi(): Promise<boolean> {
 
     if (savedIp) {
       console.log(chalk.dim(`  Trying saved device IP: ${savedIp}`));
+      const targetId = `${savedIp}:5555`;
       const retryResult = await runCommand(
-        { label: "adb connect", cmd: "adb", args: ["connect", `${savedIp}:5555`] },
+        { label: "adb connect", cmd: "adb", args: ["connect", targetId] },
         { stdio: "pipe" },
       );
-      if (retryResult.success) {
-        console.log(chalk.green(`  Reconnected to ${savedIp}:5555 over WiFi\n`));
+      if (retryResult.success && await verifyWirelessDevice(targetId)) {
+        console.log(chalk.green(`  Reconnected to ${targetId} over WiFi\n`));
         return true;
       }
-      console.log(chalk.yellow(`  Could not reconnect to ${savedIp}:5555`));
+      const detail = retryResult.stderr || retryResult.stdout;
+      console.log(chalk.yellow(`  Could not reconnect to ${targetId}${detail ? `: ${detail.trim()}` : ""}`));
     }
 
     if (!savedIp) {
@@ -256,13 +263,19 @@ export async function connectOverWifi(): Promise<boolean> {
       { stdio: "pipe" },
     );
 
-    if (connectResult.success) {
+    const targetId = `${ip.trim()}:5555`;
+    if (connectResult.success && await verifyWirelessDevice(targetId)) {
       saveWifiIp(ip.trim());
-      console.log(chalk.green(`  Connected to ${ip.trim()}:5555 over WiFi\n`));
+      console.log(chalk.green(`  Connected to ${targetId} over WiFi\n`));
       return true;
     }
 
-    console.error(chalk.red("  Connection failed. Make sure:"));  
+    const detail = connectResult.stderr || connectResult.stdout;
+    if (detail) {
+      console.log(chalk.yellow(`  adb connect result: ${detail.trim()}`));
+    }
+
+    console.error(chalk.red("  Connection failed. Make sure:"));
     console.log(chalk.yellow("  1. Device has Developer Options enabled"));
     console.log(chalk.yellow("  2. USB Debugging is enabled"));
     console.log(chalk.yellow("  3. Device has been authorized (USB connect once if first time)"));
@@ -299,13 +312,18 @@ export async function connectOverWifi(): Promise<boolean> {
     { stdio: "pipe" },
   );
 
-  if (!connectResult.success) {
-    console.error(chalk.red(`  Failed to connect to ${ip}:5555`));
+  const targetId = `${ip}:5555`;
+  if (!connectResult.success || !await verifyWirelessDevice(targetId)) {
+    const detail = connectResult.stderr || connectResult.stdout;
+    console.error(chalk.red(`  Failed to connect to ${targetId}`));
+    if (detail) {
+      console.log(chalk.yellow(`  adb connect result: ${detail.trim()}`));
+    }
     return false;
   }
 
   saveWifiIp(ip);
-  console.log(chalk.green(`  Connected to ${ip}:5555 over WiFi\n`));
+  console.log(chalk.green(`  Connected to ${targetId} over WiFi\n`));
   return true;
 }
 
