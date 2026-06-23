@@ -101,7 +101,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   if (resolvedTarget && !requestedDeviceConnected) {
     const savedIp = loadWifiIp();
     const options = [
-      { value: "wifi", label: "Reconnect WiFi", hint: savedIp ? `Try ${savedIp}:5555 again` : "Enter a device IP and reconnect" },
+      { value: "wifi", label: "Reconnect WiFi", hint: savedIp ? `Try the saved wireless target again (${savedIp})` : "Enter a device IP and reconnect" },
       ...readyDevices.map((d) => ({
         value: `device:${d.id}`,
         label: d.id,
@@ -166,9 +166,9 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
       console.error(chalk.red("No Android device is ready for deployment."));
       if (devices.length > 0) {
         console.log(chalk.dim(`ADB sees: ${formatDeviceList(devices)}`));
-        console.log(chalk.yellow("Tip: authorize the phone on-device, reconnect USB, or run `adb connect <phone-ip>:5555`."));
+        console.log(chalk.yellow("Tip: authorize the phone on-device, reconnect USB, or use wireless debugging on the device."));
       } else {
-        console.log(chalk.yellow("Tip: connect a phone with USB debugging enabled, or use WiFi ADB with `adb connect <phone-ip>:5555`."));
+        console.log(chalk.yellow("Tip: connect a phone with USB debugging enabled, or use wireless debugging from Developer options."));
       }
       return { exitCode: 1 };
     }
