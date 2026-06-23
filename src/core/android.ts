@@ -12,6 +12,14 @@ export interface AndroidDevice {
   model?: string;
 }
 
+interface WirelessService {
+  service?: string;
+  ipv4?: string;
+  port?: number;
+  serial?: string;
+  model?: string;
+}
+
 export function parseAdbDevices(output: string): AndroidDevice[] {
   return output
     .split(/\r?\n/)
@@ -37,6 +45,68 @@ export async function listAndroidDevices(): Promise<AndroidDevice[]> {
 
   if (!result.success) return [];
   return parseAdbDevices(result.stdout);
+}
+
+function parseAdbMdnsServices(output: string): WirelessService[] {
+  const services: WirelessService[] = [];
+  const lines = output.split(/\r?\n/).map((line) => line.trim());
+  let current: Partial<WirelessService> | undefined;
+  let depth = 0;
+
+  for (const line of lines) {
+    if (line.endsWith("{")) {
+      depth += 1;
+      if (line === "service {") {
+        current = {};
+      }
+      continue;
+    }
+
+    if (line === "}") {
+      if (current && depth >= 1) {
+        services.push(current as WirelessService);
+        current = undefined;
+      }
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+
+    if (!current) continue;
+
+    const service = line.match(/^service:\s*"([^"]+)"/)?.[1];
+    if (service) current.service = service;
+
+    const ipv4 = line.match(/^ipv4:\s*"([^"]+)"/)?.[1];
+    if (ipv4) current.ipv4 = ipv4;
+
+    const serial = line.match(/^serial:\s*"([^"]+)"/)?.[1];
+    if (serial) current.serial = serial;
+
+    const model = line.match(/^product_model:\s*"([^"]+)"/)?.[1];
+    if (model) current.model = model;
+
+    const port = line.match(/^port:\s*(\d+)/)?.[1];
+    if (port) current.port = Number.parseInt(port, 10);
+  }
+
+  return services;
+}
+
+async function listWirelessServices(): Promise<WirelessService[]> {
+  const result = await runCommand(
+    { label: "adb mdns services", cmd: "adb", args: ["mdns", "services"] },
+    { stdio: "pipe" },
+  );
+
+  if (!result.success) return [];
+  return parseAdbMdnsServices(result.stdout).filter((service) =>
+    service.service === "_adb._tcp" || service.service === "_adb-tls-connect._tcp",
+  );
+}
+
+function formatWirelessTarget(service: WirelessService): string | undefined {
+  if (!service.ipv4 || !service.port) return undefined;
+  return `${service.ipv4}:${service.port}`;
 }
 
 async function verifyWirelessDevice(targetId: string): Promise<boolean> {
@@ -218,16 +288,33 @@ export async function connectOverWifi(): Promise<boolean> {
   const devices = await listAndroidDevices();
   const usbDevices = devices.filter((d) => d.status === "device");
   const wirelessDevices = devices.filter((d) => d.id.includes(":"));
+  const discoveredServices = await listWirelessServices();
 
   if (wirelessDevices.length > 0) {
     console.log(chalk.green(`  Already connected wirelessly: ${wirelessDevices[0].id}`));
     return true;
   }
 
+  const targetFromService = discoveredServices[0] ? formatWirelessTarget(discoveredServices[0]) : undefined;
+
   if (usbDevices.length === 0) {
     const savedIp = loadWifiIp();
 
-    if (savedIp) {
+    if (targetFromService) {
+      console.log(chalk.dim(`  Auto-detected WiFi target: ${targetFromService}`));
+      const retryResult = await runCommand(
+        { label: "adb connect", cmd: "adb", args: ["connect", targetFromService] },
+        { stdio: "pipe" },
+      );
+      if (retryResult.success && await verifyWirelessDevice(targetFromService)) {
+        console.log(chalk.green(`  Connected to ${targetFromService} over WiFi\n`));
+        const [ip] = targetFromService.split(":");
+        saveWifiIp(ip);
+        return true;
+      }
+      const detail = retryResult.stderr || retryResult.stdout;
+      console.log(chalk.yellow(`  Could not connect to ${targetFromService}${detail ? `: ${detail.trim()}` : ""}`));
+    } else if (savedIp) {
       console.log(chalk.dim(`  Trying saved device IP: ${savedIp}`));
       const targetId = `${savedIp}:5555`;
       const retryResult = await runCommand(
@@ -258,12 +345,14 @@ export async function connectOverWifi(): Promise<boolean> {
       return false;
     }
 
+    const targetId = targetFromService && targetFromService.startsWith(`${ip.trim()}:`)
+      ? targetFromService
+      : `${ip.trim()}:5555`;
     const connectResult = await runCommand(
-      { label: "adb connect", cmd: "adb", args: ["connect", `${ip.trim()}:5555`] },
+      { label: "adb connect", cmd: "adb", args: ["connect", targetId] },
       { stdio: "pipe" },
     );
 
-    const targetId = `${ip.trim()}:5555`;
     if (connectResult.success && await verifyWirelessDevice(targetId)) {
       saveWifiIp(ip.trim());
       console.log(chalk.green(`  Connected to ${targetId} over WiFi\n`));
@@ -307,12 +396,13 @@ export async function connectOverWifi(): Promise<boolean> {
 
   console.log(chalk.dim("  Restarted adbd in TCP mode on port 5555"));
 
+  const serviceTarget = discoveredServices.find((service) => service.ipv4 === ip && service.port);
+  const targetId = serviceTarget ? formatWirelessTarget(serviceTarget) ?? `${ip}:5555` : `${ip}:5555`;
   const connectResult = await runCommand(
-    { label: "adb connect", cmd: "adb", args: ["connect", `${ip}:5555`] },
+    { label: "adb connect", cmd: "adb", args: ["connect", targetId] },
     { stdio: "pipe" },
   );
 
-  const targetId = `${ip}:5555`;
   if (!connectResult.success || !await verifyWirelessDevice(targetId)) {
     const detail = connectResult.stderr || connectResult.stdout;
     console.error(chalk.red(`  Failed to connect to ${targetId}`));
