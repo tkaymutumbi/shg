@@ -99,23 +99,48 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     : false;
 
   if (resolvedTarget && !requestedDeviceConnected) {
-    if (readyDevices.length === 0) {
-      const savedIp = loadWifiIp();
-      const shouldReconnect = await p.confirm({
+    const savedIp = loadWifiIp();
+    const options = [
+      { value: "wifi", label: "Reconnect WiFi", hint: savedIp ? `Try ${savedIp}:5555 again` : "Enter a device IP and reconnect" },
+      ...readyDevices.map((d) => ({
+        value: `device:${d.id}`,
+        label: d.id,
+        hint: d.model ? `${d.status}, ${d.model}` : d.status,
+      })),
+      { value: "cancel", label: "Cancel", hint: "Exit without running" },
+    ];
+
+    const choice = readyDevices.length > 0
+      ? await p.select({
+        message: `Target device "${resolvedTarget}" is not connected. What do you want to use?`,
+        options,
+      })
+      : await p.confirm({
         message: `Target device "${resolvedTarget}" is not connected${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try WiFi reconnect?`,
         initialValue: true,
       });
 
-      if (shouldReconnect) {
-        const ok = await connectOverWifi();
-        if (ok) {
-          devices = await listAndroidDevices();
-          readyDevices = devices.filter((d) => d.status === "device");
-        }
-      }
+    if (typeof choice === "symbol" || p.isCancel(choice) || choice === "cancel") {
+      return { exitCode: 1 };
     }
 
-    if (!readyDevices.some((d) => d.id === resolvedTarget)) {
+    if (choice === true || choice === "wifi") {
+      const ok = await connectOverWifi();
+      if (ok) {
+        devices = await listAndroidDevices();
+        readyDevices = devices.filter((d) => d.status === "device");
+        if (!readyDevices.some((d) => d.id === resolvedTarget)) {
+          const availableChoice = readyDevices.length === 1 ? `device:${readyDevices[0].id}` : undefined;
+          if (availableChoice) {
+            resolvedTarget = readyDevices[0].id;
+          }
+        }
+      }
+    } else if (typeof choice === "string" && choice.startsWith("device:")) {
+      resolvedTarget = choice.slice("device:".length);
+    }
+
+    if (!resolvedTarget || !readyDevices.some((d) => d.id === resolvedTarget)) {
       console.error(chalk.red(`Target device "${resolvedTarget}" not found.`));
       console.log(chalk.dim(`Available: ${formatDeviceList(devices)}`));
       return { exitCode: 1 };
