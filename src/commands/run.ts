@@ -125,16 +125,13 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     }
 
     if (choice === true || choice === "wifi") {
-      const ok = await connectOverWifi();
-      if (ok) {
+      const wifiTarget = await connectOverWifi();
+      if (wifiTarget) {
         devices = await listAndroidDevices();
         readyDevices = devices.filter((d) => d.status === "device");
-        if (!readyDevices.some((d) => d.id === resolvedTarget)) {
-          const availableChoice = readyDevices.length === 1 ? `device:${readyDevices[0].id}` : undefined;
-          if (availableChoice) {
-            resolvedTarget = readyDevices[0].id;
-          }
-        }
+        resolvedTarget = readyDevices.some((d) => d.id === wifiTarget)
+          ? wifiTarget
+          : resolvedTarget;
       }
     } else if (typeof choice === "string" && choice.startsWith("device:")) {
       resolvedTarget = choice.slice("device:".length);
@@ -155,10 +152,13 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     });
 
     if (shouldReconnect) {
-      const ok = await connectOverWifi();
-      if (ok) {
+      const wifiTarget = await connectOverWifi();
+      if (wifiTarget) {
         devices = await listAndroidDevices();
         readyDevices = devices.filter((d) => d.status === "device");
+        if (!resolvedTarget) {
+          resolvedTarget = wifiTarget;
+        }
       }
     }
 
@@ -226,8 +226,9 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
       if (deviceGone) {
         console.log(chalk.yellow("\nWiFi connection dropped during deploy. Reconnecting...\n"));
-        const reconnected = await connectOverWifi();
-        if (reconnected) {
+        const reconnectedTarget = await connectOverWifi();
+        if (reconnectedTarget) {
+          const activeTarget = reconnectedTarget;
           const launcherComponent = readLauncherComponent(projectRoot);
           if (launcherComponent) {
             console.log(chalk.dim("App was already installed. Re-launching...\n"));
@@ -235,7 +236,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
               {
                 label: "adb shell am start",
                 cmd: "adb",
-                args: ["-s", wifiTarget, "shell", "am", "start", "-n", launcherComponent],
+                args: ["-s", activeTarget, "shell", "am", "start", "-n", launcherComponent],
                 cwd: projectRoot,
               },
               { stdio: "inherit" },
@@ -243,7 +244,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
             if (relaunchResult.success) {
               console.log(chalk.green("App re-launched successfully after reconnection.\n"));
-              saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
+              saveState(projectRoot, { lastDeviceId: activeTarget, lastVariant: variant, lastFlavor: flavor });
               return { exitCode: 0 };
             }
           }
@@ -259,7 +260,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
             {
               label: "adb install -r",
               cmd: "adb",
-              args: ["-s", wifiTarget, "install", "-r", "-d", apkPath],
+              args: ["-s", activeTarget, "install", "-r", "-d", apkPath],
               cwd: projectRoot,
             },
             { stdio: "inherit" },
@@ -267,7 +268,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
           if (reinstallResult.success) {
             console.log(chalk.green("App re-installed and will launch automatically.\n"));
-            saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
+            saveState(projectRoot, { lastDeviceId: activeTarget, lastVariant: variant, lastFlavor: flavor });
             return { exitCode: 0 };
           }
         }

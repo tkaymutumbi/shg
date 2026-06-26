@@ -188,6 +188,17 @@ async function connectWirelessTarget(targetId: string): Promise<boolean> {
   return false;
 }
 
+function printWirelessFailureHelp(savedIp?: string): void {
+  console.error(chalk.red("  Wireless connection failed. Check these in order:"));
+  console.log(chalk.yellow("  1. Use 'Pair with pairing code' first if the phone restarted or this computer is no longer paired"));
+  console.log(chalk.yellow("  2. Enter the connect IP:port only from the main Wireless debugging screen, not the pairing screen"));
+  console.log(chalk.yellow("  3. Keep the Wireless debugging screen open while connecting so adb can discover the current port"));
+  console.log(chalk.yellow("  4. Confirm the phone and computer are on the same LAN/subnet"));
+  if (savedIp) {
+    console.log(chalk.dim(`  Last saved phone IP: ${savedIp}`));
+  }
+}
+
 async function waitForWirelessService(
   serviceName: string,
   timeoutMs: number,
@@ -210,7 +221,7 @@ async function waitForWirelessService(
   return undefined;
 }
 
-async function connectAfterPairing(preferredIp?: string): Promise<boolean> {
+async function connectAfterPairing(preferredIp?: string): Promise<string | undefined> {
   const connectService = await waitForWirelessService(
     "Waiting for wireless connect service",
     30000,
@@ -218,17 +229,19 @@ async function connectAfterPairing(preferredIp?: string): Promise<boolean> {
   );
   const targetId = connectService ? formatWirelessTarget(connectService) : undefined;
 
-  if (targetId) return connectWirelessTarget(targetId);
+  if (targetId) {
+    return await connectWirelessTarget(targetId) ? targetId : undefined;
+  }
 
   if (preferredIp) {
     console.log(chalk.yellow(`  Pairing succeeded, but no connect port was discovered for ${preferredIp}.`));
     console.log(chalk.dim("  Open Developer options -> Wireless debugging, then try SHG again while that screen is open."));
   }
 
-  return false;
+  return undefined;
 }
 
-async function pairWirelessTarget(pairingTarget: string, pairingCode: string): Promise<boolean> {
+async function pairWirelessTarget(pairingTarget: string, pairingCode: string): Promise<string | undefined> {
   const pairResult = await runCommand(
     { label: "adb pair", cmd: "adb", args: ["pair", pairingTarget, pairingCode] },
     { stdio: "pipe" },
@@ -237,7 +250,7 @@ async function pairWirelessTarget(pairingTarget: string, pairingCode: string): P
   const detail = pairResult.stderr || pairResult.stdout;
   if (!pairResult.success) {
     console.error(chalk.red(`  Pairing failed${detail ? `: ${detail.trim()}` : ""}`));
-    return false;
+    return undefined;
   }
 
   if (detail.trim()) console.log(chalk.dim(`  ${detail.trim()}`));
@@ -245,7 +258,7 @@ async function pairWirelessTarget(pairingTarget: string, pairingCode: string): P
   return connectAfterPairing(ip);
 }
 
-async function pairWithCode(discoveredServices: WirelessService[]): Promise<boolean> {
+async function pairWithCode(discoveredServices: WirelessService[]): Promise<string | undefined> {
   const pairingServices = discoveredServices.filter((service) => service.service === PAIRING_SERVICE_TYPE);
   const pairingTargetFromService = pairingServices.length === 1 ? formatWirelessTarget(pairingServices[0]) : undefined;
 
@@ -261,7 +274,7 @@ async function pairWithCode(discoveredServices: WirelessService[]): Promise<bool
 
   if (typeof address !== "string") {
     console.log(chalk.yellow("  Cancelled."));
-    return false;
+    return undefined;
   }
 
   const code = await p.text({
@@ -271,7 +284,7 @@ async function pairWithCode(discoveredServices: WirelessService[]): Promise<bool
 
   if (typeof code !== "string") {
     console.log(chalk.yellow("  Cancelled."));
-    return false;
+    return undefined;
   }
 
   return pairWirelessTarget(address.trim(), code.trim());
@@ -445,7 +458,7 @@ function saveWifiIp(ip: string): void {
   writeJsonFile(getWifiStatePath(), { lastIp: ip });
 }
 
-export async function connectOverWifi(): Promise<boolean> {
+export async function connectOverWifi(): Promise<string | undefined> {
   console.log(chalk.cyan("\nSetting up WiFi debugging...\n"));
 
   const devices = await listAndroidDevices();
@@ -455,7 +468,7 @@ export async function connectOverWifi(): Promise<boolean> {
 
   if (wirelessDevices.length > 0) {
     console.log(chalk.green(`  Already connected wirelessly: ${wirelessDevices[0].id}`));
-    return true;
+    return wirelessDevices[0].id;
   }
 
   const connectService = findConnectService(discoveredServices);
@@ -466,7 +479,7 @@ export async function connectOverWifi(): Promise<boolean> {
 
     if (targetFromService) {
       console.log(chalk.dim(`  Auto-detected WiFi target: ${targetFromService}`));
-      if (await connectWirelessTarget(targetFromService)) return true;
+      if (await connectWirelessTarget(targetFromService)) return targetFromService;
     }
 
     const reconnectChoice = await p.select({
@@ -482,7 +495,7 @@ export async function connectOverWifi(): Promise<boolean> {
 
     if (typeof reconnectChoice !== "string" || reconnectChoice === "cancel") {
       console.log(chalk.yellow("  Cancelled."));
-      return false;
+      return undefined;
     }
 
     if (reconnectChoice === "code") {
@@ -490,11 +503,12 @@ export async function connectOverWifi(): Promise<boolean> {
     }
 
     if (reconnectChoice === "detected" && targetFromService) {
-      return connectWirelessTarget(targetFromService);
+      return await connectWirelessTarget(targetFromService) ? targetFromService : undefined;
     }
 
     if (reconnectChoice === "legacy" && savedIp) {
-      return connectWirelessTarget(`${savedIp}:5555`);
+      const targetId = `${savedIp}:5555`;
+      return await connectWirelessTarget(targetId) ? targetId : undefined;
     }
 
     if (reconnectChoice === "manual") {
@@ -506,18 +520,15 @@ export async function connectOverWifi(): Promise<boolean> {
 
       if (typeof target !== "string") {
         console.log(chalk.yellow("  Cancelled."));
-        return false;
+        return undefined;
       }
 
-      return connectWirelessTarget(target.trim());
+      const manualTarget = target.trim();
+      return await connectWirelessTarget(manualTarget) ? manualTarget : undefined;
     }
 
-    console.error(chalk.red("  Connection failed. Make sure:"));
-    console.log(chalk.yellow("  1. Device has Developer Options enabled"));
-    console.log(chalk.yellow("  2. Wireless debugging is enabled and its screen is open"));
-    console.log(chalk.yellow("  3. Phone and computer are on the same WiFi"));
-    console.log(chalk.yellow("  4. Use pairing code again after the phone restarts"));
-    return false;
+    printWirelessFailureHelp(savedIp);
+    return undefined;
   }
 
   const deviceId = usbDevices[0].id;
@@ -527,7 +538,7 @@ export async function connectOverWifi(): Promise<boolean> {
   if (!ip) {
     console.error(chalk.red("  Could not determine device IP."));
     console.log(chalk.yellow("  Make sure WiFi is enabled on the device."));
-    return false;
+    return undefined;
   }
 
   console.log(chalk.dim(`  Device IP: ${ip}`));
@@ -539,14 +550,14 @@ export async function connectOverWifi(): Promise<boolean> {
 
   if (!tcpipResult.success) {
     console.error(chalk.red("  Failed to restart adbd in TCP mode."));
-    return false;
+    return undefined;
   }
 
   console.log(chalk.dim("  Restarted adbd in TCP mode on port 5555"));
 
   const serviceTarget = findConnectService(discoveredServices, ip);
   const targetId = serviceTarget ? formatWirelessTarget(serviceTarget) ?? `${ip}:5555` : `${ip}:5555`;
-  return connectWirelessTarget(targetId);
+  return await connectWirelessTarget(targetId) ? targetId : undefined;
 }
 
 export function getLanIp(): string {
