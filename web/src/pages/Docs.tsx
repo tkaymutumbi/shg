@@ -235,7 +235,7 @@ const DOC_CONTENT: Record<string, any> = {
     title: 'WiFi Debugging',
     description: 'Deploy and debug your app without cables.',
     sections: [
-      { id: 'overview', title: 'How it works', content: 'SHG handles the ADB over TCP/IP handshake automatically, allowing for seamless wireless deployment.', type: 'text' }
+      { id: 'overview', title: 'How it works', content: 'SHG discovers wireless ADB targets with mDNS, supports QR-code and pairing-code recovery after phone restarts, and connects to Android\'s current dynamic port instead of assuming one fixed device address.', type: 'text' }
     ]
   },
   // CORE CONTENT

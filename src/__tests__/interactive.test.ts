@@ -21,7 +21,11 @@ mock.module("@clack/prompts", () => ({
 }));
 
 mock.module("execa", () => ({
-  execa: async () => ({ exitCode: 0, stdout: "mocked", stderr: "" }),
+  execa: async (cmd: string, args: string[]) => ({
+    exitCode: 0,
+    stdout: cmd === "adb" && args[0] === "devices" ? "List of devices attached\nmocked\tdevice\n" : "mocked",
+    stderr: "",
+  }),
   execaSync: () => ({ exitCode: 0, stdout: "mocked\n", stderr: "" }),
 }));
 

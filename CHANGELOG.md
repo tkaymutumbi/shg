@@ -9,6 +9,7 @@ The format is based on Keep a Changelog, and this project follows Semantic Versi
 ### Added
 - **Interactive dev connection prompt**: `shg` → `Dev Server` now asks for Auto / WiFi / USB-Emulator mode, plus port and optional WiFi host
 - **Doctor environment guards**: detects Capacitor major-version mismatches and Android Java target vs installed JDK mismatches before long Gradle runs
+- **Wireless debugging pairing**: `shg run` / `shg dev --wifi` can now recover after phone restarts with QR-code pairing, pairing-code pairing, and dynamic mDNS connect-port discovery
 
 ### Fixed
 - **`shg build --flavor`**: now generates the correct Gradle `assemble<Flavor><Variant>` task

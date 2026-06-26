@@ -137,7 +137,7 @@ shg dev
 shg dev --wifi
 ```
 
-The device IP is auto-detected. If LAN IP detection fails, SHG now falls back safely instead of passing an invalid host. If no device is found, you'll be prompted to enter the IP manually.
+SHG auto-detects the active wireless ADB target with mDNS. If the phone restarted and Android changed its wireless debugging port, SHG offers QR-code pairing, pairing-code pairing, detected connect ports, and a legacy `:5555` retry only when you explicitly choose it.
 
 **Custom dev server:**
 
