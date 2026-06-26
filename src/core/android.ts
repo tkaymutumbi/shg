@@ -1,12 +1,10 @@
 import { existsSync, mkdirSync, symlinkSync, chmodSync, unlinkSync, copyFileSync } from "node:fs";
 import * as p from "@clack/prompts";
-import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { homedir, networkInterfaces } from "node:os";
 import { runCommand } from "./executor.js";
 import { readJsonFile, writeJsonFile } from "./fsjson.js";
 import chalk from "chalk";
-import QRCode from "qrcode";
 
 export interface AndroidDevice {
   id: string;
@@ -128,10 +126,6 @@ function parseMdnsTableLine(line: string): WirelessService | undefined {
   };
 }
 
-function examplePairingTarget(): string {
-  return "192.0.2.10:37123";
-}
-
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -251,32 +245,6 @@ async function pairWirelessTarget(pairingTarget: string, pairingCode: string): P
   return connectAfterPairing(ip);
 }
 
-async function pairWithQrCode(): Promise<boolean> {
-  const serviceName = `adb-${randomBytes(6).toString("hex")}`;
-  const password = randomBytes(16).toString("base64url");
-  const qrPayload = `WIFI:T:ADB;S:${serviceName};P:${password};;`;
-  const qr = await QRCode.toString(qrPayload, { type: "terminal", small: true });
-
-  console.log(chalk.cyan("\nScan this from the phone:"));
-  console.log(chalk.dim("  Developer options -> Wireless debugging -> Pair device with QR code\n"));
-  console.log(qr);
-
-  const pairingService = await waitForWirelessService(
-    "Waiting for QR pairing service",
-    90000,
-    (services) => findPairingService(services, serviceName),
-  );
-  const pairingTarget = pairingService ? formatWirelessTarget(pairingService) : undefined;
-
-  if (!pairingTarget) {
-    console.log(chalk.yellow("  QR scan was not detected by ADB."));
-    console.log(chalk.dim("  Keep the Wireless debugging screen open, confirm both devices are on the same WiFi, or use pairing code."));
-    return false;
-  }
-
-  return pairWirelessTarget(pairingTarget, password);
-}
-
 async function pairWithCode(discoveredServices: WirelessService[]): Promise<boolean> {
   const pairingServices = discoveredServices.filter((service) => service.service === PAIRING_SERVICE_TYPE);
   const pairingTargetFromService = pairingServices.length === 1 ? formatWirelessTarget(pairingServices[0]) : undefined;
@@ -286,9 +254,9 @@ async function pairWithCode(discoveredServices: WirelessService[]): Promise<bool
 
   const address = await p.text({
     message: "Enter pairing IP:port shown on the phone:",
-    placeholder: pairingTargetFromService ?? examplePairingTarget(),
+    placeholder: pairingTargetFromService ?? "192.0.2.10:37123",
     initialValue: pairingTargetFromService,
-    validate: (val?: string) => (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(val?.trim() ?? "") ? undefined : `Use IP:port, for example ${examplePairingTarget()}`),
+    validate: (val?: string) => (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(val?.trim() ?? "") ? undefined : "Use IP:port, for example 192.0.2.10:37123"),
   }) as string | symbol;
 
   if (typeof address !== "string") {
@@ -504,7 +472,6 @@ export async function connectOverWifi(): Promise<boolean> {
     const reconnectChoice = await p.select({
       message: "Wireless ADB is not connected. What do you want to do?",
       options: [
-        { value: "qr", label: "Pair with QR code", hint: "Android Studio-style scan from the phone" },
         { value: "code", label: "Pair with pairing code", hint: "Use the IP:port and code shown by Android" },
         ...(targetFromService ? [{ value: "detected", label: "Use detected connect port", hint: targetFromService }] : []),
         ...(savedIp ? [{ value: "legacy", label: "Try saved legacy port", hint: `${savedIp}:5555` }] : []),
@@ -516,10 +483,6 @@ export async function connectOverWifi(): Promise<boolean> {
     if (typeof reconnectChoice !== "string" || reconnectChoice === "cancel") {
       console.log(chalk.yellow("  Cancelled."));
       return false;
-    }
-
-    if (reconnectChoice === "qr") {
-      return pairWithQrCode();
     }
 
     if (reconnectChoice === "code") {
@@ -537,8 +500,8 @@ export async function connectOverWifi(): Promise<boolean> {
     if (reconnectChoice === "manual") {
       const target = await p.text({
         message: "Enter connect IP:port shown in Wireless debugging:",
-        placeholder: savedIp ? `${savedIp}:37123` : examplePairingTarget(),
-        validate: (val?: string) => (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(val?.trim() ?? "") ? undefined : `Use IP:port, for example ${examplePairingTarget()}`),
+        placeholder: savedIp ? `${savedIp}:37123` : "192.0.2.10:37123",
+        validate: (val?: string) => (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(val?.trim() ?? "") ? undefined : "Use IP:port, for example 192.0.2.10:37123"),
       }) as string | symbol;
 
       if (typeof target !== "string") {
@@ -553,7 +516,7 @@ export async function connectOverWifi(): Promise<boolean> {
     console.log(chalk.yellow("  1. Device has Developer Options enabled"));
     console.log(chalk.yellow("  2. Wireless debugging is enabled and its screen is open"));
     console.log(chalk.yellow("  3. Phone and computer are on the same WiFi"));
-    console.log(chalk.yellow("  4. Use QR or pairing code again after the phone restarts"));
+    console.log(chalk.yellow("  4. Use pairing code again after the phone restarts"));
     return false;
   }
 

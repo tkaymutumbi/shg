@@ -137,7 +137,7 @@ shg dev
 shg dev --wifi
 ```
 
-SHG auto-detects the active wireless ADB target with mDNS. If the phone restarted and Android changed its wireless debugging port, SHG offers QR-code pairing, pairing-code pairing, detected connect ports, and a legacy `:5555` retry only when you explicitly choose it.
+SHG auto-detects the active wireless ADB target with mDNS. If the phone restarted and Android changed its wireless debugging port, SHG offers pairing-code recovery, detected connect ports, and a legacy `:5555` retry only when you explicitly choose it.
 
 **Custom dev server:**
 
