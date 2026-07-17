@@ -99,6 +99,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     : false;
 
   if (resolvedTarget && !requestedDeviceConnected) {
+    let attemptedWifiReconnect = false;
     const savedIp = loadWifiIp();
     const options = [
       { value: "wifi", label: "Reconnect WiFi", hint: savedIp ? `Try the saved wireless target again (${savedIp})` : "Enter a device IP and reconnect" },
@@ -125,19 +126,27 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     }
 
     if (choice === true || choice === "wifi") {
+      attemptedWifiReconnect = true;
+      // connectOverWifi has an internal retry loop; it only returns undefined when the user cancels
       const wifiTarget = await connectOverWifi();
       if (wifiTarget) {
+        resolvedTarget = wifiTarget;
         devices = await listAndroidDevices();
         readyDevices = devices.filter((d) => d.status === "device");
-        resolvedTarget = readyDevices.some((d) => d.id === wifiTarget)
-          ? wifiTarget
-          : resolvedTarget;
+      } else {
+        console.error(chalk.red("WiFi reconnect cancelled."));
+        return { exitCode: 1 };
       }
     } else if (typeof choice === "string" && choice.startsWith("device:")) {
       resolvedTarget = choice.slice("device:".length);
     }
 
     if (!resolvedTarget || !readyDevices.some((d) => d.id === resolvedTarget)) {
+      if (attemptedWifiReconnect) {
+        console.error(chalk.red("WiFi reconnect did not produce a ready device."));
+        console.log(chalk.dim(`Available: ${formatDeviceList(devices)}`));
+        return { exitCode: 1 };
+      }
       console.error(chalk.red(`Target device "${resolvedTarget}" not found.`));
       console.log(chalk.dim(`Available: ${formatDeviceList(devices)}`));
       return { exitCode: 1 };

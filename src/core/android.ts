@@ -482,53 +482,57 @@ export async function connectOverWifi(): Promise<string | undefined> {
       if (await connectWirelessTarget(targetFromService)) return targetFromService;
     }
 
-    const reconnectChoice = await p.select({
-      message: "Wireless ADB is not connected. What do you want to do?",
-      options: [
-        { value: "code", label: "Pair with pairing code", hint: "Use the IP:port and code shown by Android" },
-        ...(targetFromService ? [{ value: "detected", label: "Use detected connect port", hint: targetFromService }] : []),
-        ...(savedIp ? [{ value: "legacy", label: "Try saved legacy port", hint: `${savedIp}:5555` }] : []),
-        { value: "manual", label: "Enter connect IP:port", hint: "Use the connect address from Wireless debugging" },
-        { value: "cancel", label: "Cancel", hint: "Exit without connecting" },
-      ],
-    }) as string | symbol;
-
-    if (typeof reconnectChoice !== "string" || reconnectChoice === "cancel") {
-      console.log(chalk.yellow("  Cancelled."));
-      return undefined;
-    }
-
-    if (reconnectChoice === "code") {
-      return pairWithCode(discoveredServices);
-    }
-
-    if (reconnectChoice === "detected" && targetFromService) {
-      return await connectWirelessTarget(targetFromService) ? targetFromService : undefined;
-    }
-
-    if (reconnectChoice === "legacy" && savedIp) {
-      const targetId = `${savedIp}:5555`;
-      return await connectWirelessTarget(targetId) ? targetId : undefined;
-    }
-
-    if (reconnectChoice === "manual") {
-      const target = await p.text({
-        message: "Enter connect IP:port shown in Wireless debugging:",
-        placeholder: savedIp ? `${savedIp}:37123` : "192.0.2.10:37123",
-        validate: (val?: string) => (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(val?.trim() ?? "") ? undefined : "Use IP:port, for example 192.0.2.10:37123"),
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const reconnectChoice = await p.select({
+        message: "Wireless ADB is not connected. What do you want to do?",
+        options: [
+          { value: "code", label: "Pair with pairing code", hint: "Use the IP:port and code shown by Android" },
+          ...(targetFromService ? [{ value: "detected", label: "Use detected connect port", hint: targetFromService }] : []),
+          { value: "manual", label: "Enter connect IP:port", hint: "Use the connect address from Wireless debugging" },
+          { value: "cancel", label: "Cancel", hint: "Exit without connecting" },
+        ],
       }) as string | symbol;
 
-      if (typeof target !== "string") {
+      if (typeof reconnectChoice !== "string" || reconnectChoice === "cancel") {
         console.log(chalk.yellow("  Cancelled."));
         return undefined;
       }
 
-      const manualTarget = target.trim();
-      return await connectWirelessTarget(manualTarget) ? manualTarget : undefined;
-    }
+      if (reconnectChoice === "code") {
+        return pairWithCode(discoveredServices);
+      }
 
-    printWirelessFailureHelp(savedIp);
-    return undefined;
+      if (reconnectChoice === "detected" && targetFromService) {
+        if (await connectWirelessTarget(targetFromService)) return targetFromService;
+        printWirelessFailureHelp(savedIp);
+        // loop back to let the user choose again
+        continue;
+      }
+
+      if (reconnectChoice === "manual") {
+        const target = await p.text({
+          message: "Enter connect IP:port shown in Wireless debugging:",
+          placeholder: savedIp ? `${savedIp}:<port from Android>` : "<ip>:<port from Android>",
+          validate: (val?: string) => (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(val?.trim() ?? "") ? undefined : "Use the exact IP:port shown on the Wireless debugging screen"),
+        }) as string | symbol;
+
+        if (typeof target !== "string") {
+          console.log(chalk.yellow("  Cancelled."));
+          return undefined;
+        }
+
+        const manualTarget = target.trim();
+        if (await connectWirelessTarget(manualTarget)) return manualTarget;
+
+        // Connection failed — show help and loop back so the user can try a different port
+        printWirelessFailureHelp(savedIp);
+        continue;
+      }
+
+      printWirelessFailureHelp(savedIp);
+      return undefined;
+    }
   }
 
   const deviceId = usbDevices[0].id;

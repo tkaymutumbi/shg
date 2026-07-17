@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": true,
+  "preferences": [],
+  "projectFacts": [],
+  "recentDecisions": [],
+  "currentFocus": "what is this",
+  "lastSourceText": "what is this\nIt’s the **GAU coding-agent interface** for the `/home/tk/shg` project. - Left: projects and chat history - Center: conversation with the AI agent - Top: actions like opening VS Code or creating a PR - Bottom: message box, model, token/cost status The screenshot shows your “are you alive” test and the agent’s reply.",
+  "lastUpdatedAt": "2026-07-16T19:08:30.479Z"
+}

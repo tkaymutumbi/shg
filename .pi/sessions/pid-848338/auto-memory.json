@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": true,
+  "preferences": [],
+  "projectFacts": [],
+  "recentDecisions": [],
+  "currentFocus": "hey what is this about ?",
+  "lastSourceText": "hey what is this about ?\nThis is **SHG**, an interactive CLI for Capacitor Android development. It automates: - Android setup and deployment - Live reload over USB/Wi‑Fi - APK/AAB builds - ADB device management and logs - Capacitor plugins, assets, version bumps, and diagnostics The repo also includes a React/Vite documentation website. There’s an audit handoff listing several bugs to fix, and the working tree currently contains uncommitted changes around Android running/wireless support and tests.",
+  "lastUpdatedAt": "2026-07-16T16:38:24.940Z"
+}

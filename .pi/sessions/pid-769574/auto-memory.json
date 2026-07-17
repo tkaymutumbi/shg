@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": true,
+  "preferences": [],
+  "projectFacts": [],
+  "recentDecisions": [],
+  "currentFocus": "hey what is this project about",
+  "lastSourceText": "hey what is this project about\nThis is **SHG**, an interactive and automation-focused CLI for **Capacitor Android development**. It helps developers: - Set up Capacitor and Android platforms - Run live-reload development over USB or Wi‑Fi - Build, sync, deploy, and clean Android apps - Manage devices, plugins, logs, assets, and versions - Diagnose Android/Java/SDK issues - Scaffold new apps The repository also includes a **React + Vite documentation website** under `web/`. The CLI is written in **TypeScript**, runs with **Bun or Node.js**, and is invoked as `shg`.",
+  "lastUpdatedAt": "2026-07-16T15:25:00.139Z"
+}

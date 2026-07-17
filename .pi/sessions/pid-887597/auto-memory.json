@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": true,
+  "preferences": [],
+  "projectFacts": [],
+  "recentDecisions": [],
+  "currentFocus": "hey wht is this about",
+  "lastSourceText": "hey wht is this about\nThis is **SHG**, a command-line tool for simplifying Capacitor Android development. It helps you: - Set up Capacitor Android projects - Run live reload with `shg dev` - Build APKs/AABs - Deploy to phones/emulators - Manage plugins and devices - View Android logs - Diagnose environment issues - Bump app versions The repository also contains a React/Vite documentation website in `web/`. The main CLI code is in `src/`.",
+  "lastUpdatedAt": "2026-07-16T17:12:06.872Z"
+}
