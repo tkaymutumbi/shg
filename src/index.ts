@@ -8,6 +8,7 @@ import { runBuild } from "./commands/build.js";
 import { runBump } from "./commands/bump.js";
 import { runClean } from "./commands/clean.js";
 import { runConfig } from "./commands/config.js";
+import { runConnect } from "./commands/connect.js";
 import { runCreate } from "./commands/create.js";
 import { runDeploy } from "./commands/deploy.js";
 import { runDev } from "./commands/dev.js";
@@ -16,6 +17,7 @@ import { runDevices } from "./commands/devices.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runLogs } from "./commands/logs.js";
 import { runOpen } from "./commands/open.js";
+import { runInstall } from "./commands/install.js";
 import { runPlugin } from "./commands/plugin.js";
 import { runRun } from "./commands/run.js";
 import { runSetup } from "./commands/setup.js";
@@ -36,6 +38,7 @@ const COMMAND_REGISTRY: Record<string, CommandHandler> = {
   bump: (ctx) => runBump(ctx),
   clean: (ctx) => runClean(ctx),
   config: (ctx, rest) => runConfig(ctx, rest),
+  connect: (ctx) => runConnect(ctx),
   create: (ctx, rest) => runCreate(ctx, rest),
   deploy: (ctx) => runDeploy(ctx),
   dev: (ctx) => runDev(ctx),
@@ -44,6 +47,7 @@ const COMMAND_REGISTRY: Record<string, CommandHandler> = {
   doctor: (ctx) => runDoctor(ctx),
   logs: (ctx) => runLogs(ctx),
   open: (ctx) => runOpen(ctx),
+  install: (ctx) => runInstall(ctx),
   plugin: (ctx, rest) => runPlugin(ctx, rest),
   run: (ctx) => runRun(ctx),
   screenshot: (ctx) => runScreenshot(ctx),
@@ -74,6 +78,8 @@ Commands:
   deploy                  Build/sync/run flows
   setup                   Setup capacitor dependencies and platform
   run                     Run Android app with optional targeting
+  connect                 Pair/reconnect Android Wireless debugging with QR
+  install                 Build, install, and launch an APK
   build                   Build APK/AAB (debug/release; use --aab or --both)
   clean                   Clean project build artifacts
   devices                 List devices or connect over WiFi with --wifi
@@ -89,8 +95,12 @@ Commands:
   config                  Read or update SHG config
 
 Examples:
+  shg connect
   shg build
   shg run
+  shg install
+  shg install --release
+  shg install --release --flavor free
   shg dev --wifi --host <LAN-IP>       Optional wireless live reload
   shg doctor --fix
   shg deploy --all --device emulator-5554 --variant debug
@@ -122,6 +132,18 @@ Global Flags:
   -v, --version           Show version
       --verbose           Verbose command output
       --json              JSON output where supported
+
+Connect flags:
+  shg connect            QR-pair Android 11+ Wireless debugging (mDNS)
+  shg devices --wifi     Same connection flow, with manual fallback
+
+Install flags:
+  --release              Select release APK
+  --variant <name>       Select a Gradle variant
+  --flavor <name>        Select a product flavor
+  --device <id>          Target one ADB device
+  --no-build             Install an existing matching APK
+  --no-sync              Skip web build and Capacitor sync
 `);
 }
 

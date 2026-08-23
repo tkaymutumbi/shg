@@ -107,6 +107,8 @@ const NAVIGATION: Record<string, NavigationGroup[]> = {
       title: 'Commands',
       items: [
         { id: 'shg-dev', label: 'shg dev' },
+        { id: 'shg-connect', label: 'shg connect' },
+        { id: 'shg-install', label: 'shg install' },
         { id: 'shg-deploy', label: 'shg deploy' },
         { id: 'shg-doctor', label: 'shg doctor' },
         { id: 'shg-setup', label: 'shg setup' },
@@ -212,6 +214,34 @@ const DOC_CONTENT: Record<string, DocPage> = {
       ]}
     ]
   },
+  'shg-connect': {
+    badge: 'CLI Commands',
+    title: 'shg connect',
+    description: 'Pair Android 11+ Wireless debugging from the terminal with an Android-compatible QR code.',
+    sections: [
+      { id: 'usage', title: 'Usage', content: 'shg connect', type: 'code' },
+      { id: 'first-pairing', title: 'First pairing', content: 'Enable Developer options → Wireless debugging on the phone, choose Pair device with QR code, and scan the QR shown by SHG. SHG waits for the exact studio-* mDNS pairing service, runs adb pair, discovers the secure connect service, and verifies the device is ready.', type: 'text' },
+      { id: 'repeat', title: 'After pairing', content: 'shg dev\nshg run\nshg install --release', type: 'code' },
+      { id: 'fallback', title: 'When mDNS is blocked', content: 'Keep the computer and phone on the same Wi-Fi network. Check VPN isolation, guest-network multicast, Windows Defender Firewall, and platform-tools. `shg devices --wifi` retains the IP/port and six-digit pairing-code fallback.', type: 'text' },
+      { id: 'secret', title: 'QR safety', content: 'The QR contains a short-lived pairing credential. Do not share screenshots. SHG never saves the temporary QR secret; it stores only the reusable post-pairing endpoint.', type: 'text' }
+    ]
+  },
+  'shg-install': {
+    badge: 'CLI Commands',
+    title: 'shg install',
+    description: 'Build, install, and launch the selected APK on a connected or paired Android device.',
+    sections: [
+      { id: 'usage', title: 'Usage', content: 'shg install\nshg install --release\nshg install --release --flavor free --device <id>', type: 'code' },
+      { id: 'options', title: 'Options', type: 'list', items: [
+        { title: '--release', description: 'Select the release APK.' },
+        { title: '--variant <name>', description: 'Select a Gradle variant.' },
+        { title: '--flavor <name>', description: 'Select a product flavor.' },
+        { title: '--device <id>', description: 'Target an exact ADB device.' },
+        { title: '--no-build / --no-sync', description: 'Install an existing APK or skip the web/Capacitor sync step.' }
+      ]},
+      { id: 'artifacts', title: 'APK versus AAB', content: 'Debug and release APKs can be installed directly. Build an AAB with `shg build --release --aab` for Play Store or bundle distribution; ordinary `adb install` does not install an AAB.', type: 'text' }
+    ]
+  },
   'shg-screenshot': {
     badge: 'CLI Commands',
     title: 'shg screenshot',
@@ -295,7 +325,7 @@ const DOC_CONTENT: Record<string, DocPage> = {
     title: 'WiFi Debugging',
     description: 'Deploy and debug your app without cables.',
     sections: [
-      { id: 'overview', title: 'How it works', content: 'SHG handles the ADB over TCP/IP handshake automatically, allowing for seamless wireless deployment.', type: 'text' }
+      { id: 'overview', title: 'How it works', content: '`shg connect` uses Android Studio-compatible QR pairing for Android 11+ and discovers `_adb-tls-pairing._tcp` and `_adb-tls-connect._tcp` services through ADB mDNS. Legacy IP/pairing-code and USB workflows remain available when mDNS is unavailable.', type: 'text' }
     ]
   },
   // CORE CONTENT

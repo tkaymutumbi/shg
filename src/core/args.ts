@@ -1,4 +1,4 @@
-export type RootCommand = "doctor" | "deploy" | "setup" | "run" | "devices" | "device" | "config" | "dev" | "logs" | "plugin" | "open" | "build" | "clean" | "assets" | "screenshot" | "bump" | "upgrade" | "create";
+export type RootCommand = "doctor" | "deploy" | "setup" | "run" | "devices" | "device" | "connect" | "install" | "config" | "dev" | "logs" | "plugin" | "open" | "build" | "clean" | "assets" | "screenshot" | "bump" | "upgrade" | "create";
 
 export interface ParsedArgs {
   command?: RootCommand;
@@ -16,7 +16,7 @@ const SHORT_FLAG_MAP: Record<string, string> = {
 
 const VALUE_FLAGS = new Set(["device", "variant", "flavor", "host", "port", "tag", "level", "to", "platform", "output", "text", "key", "package"]);
 const BOOLEAN_FLAGS = new Set([
-  "help", "version", "verbose", "json", "wifi", "skip-build", "fix",
+  "help", "version", "verbose", "json", "wifi", "skip-build", "no-build", "fix",
   "all", "build", "sync", "run", "install", "init", "update",
   "add-android", "release", "no-sync", "global", "aab", "apk", "both",
   "wake", "keep-awake", "stay-awake",
@@ -80,7 +80,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   const command = rest[0] as RootCommand | undefined;
-  const knownCommands: RootCommand[] = ["doctor", "deploy", "setup", "run", "devices", "device", "config", "dev", "logs", "plugin", "open", "build", "clean", "assets", "screenshot", "bump", "upgrade", "create"];
+  const knownCommands: RootCommand[] = ["doctor", "deploy", "setup", "run", "devices", "device", "connect", "install", "config", "dev", "logs", "plugin", "open", "build", "clean", "assets", "screenshot", "bump", "upgrade", "create"];
   if (command && !knownCommands.includes(command)) {
     errors.push(`Unknown command: ${command}`);
   }

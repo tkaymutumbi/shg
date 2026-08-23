@@ -35,6 +35,8 @@ The project also includes a [documentation website](web/) (React + Vite) with fu
 - **Interactive TUI** — Launch `shg` with no arguments to get a menu-driven interface
 - **Bundled Verification** — Build and launch a self-contained debug app with `shg build && shg run`
 - **Optional Live Reload** — Start a Vite server and Android app together with `shg dev`; use `shg dev --wifi` for focused wireless UI work
+- **QR Wireless Pairing** — Run `shg connect` to pair Android 11+ through a terminal QR code and mDNS
+- **APK Installation** — Run `shg install` or `shg install --release` to build, install, and launch the selected APK
 - **Interactive Dev Prompting** — Pick Auto, WiFi, or USB/Emulator from the interactive dev flow
 - **Auto-Install adb** — Downloads platform-tools automatically if adb is missing
 - **Smart Deploy** — Build → sync → run in one command with failure safety
@@ -71,7 +73,7 @@ bun link
 - [Node.js](https://nodejs.org) 18+ (required to run the compiled CLI; Bun is still needed for the wrapped project commands)
 - [Java JDK](https://adoptium.net) 17+ (for Android builds)
 - [Android SDK](https://developer.android.com/studio) with `ANDROID_HOME` or `ANDROID_SDK_ROOT` set
-- `adb` available on PATH
+- Current Android SDK Platform-Tools (`adb`) available on PATH; SHG can download a private copy when needed
 
 ### Windows
 
@@ -86,8 +88,10 @@ shg
 # Or jump straight to a command
 shg doctor --fix
 shg setup --install --add-android
+shg connect                         # first-time QR pairing
 shg build                            # Bundled debug APK
 shg run                              # Install and launch it
+shg install --release               # Build/install/launch release APK
 shg device status                    # Inspect the connected phone
 shg device screenshot                # Capture a temporary screen image
 shg dev --wifi --host <LAN-IP>       # Optional live reload
@@ -104,7 +108,9 @@ Running `shg` with no arguments opens the interactive TUI:
 ├─────────────────────────────────────────────┤
 │  What do you want to do?                    │
 │                                             │
-│  ○ Dev Server (Live Reload)                 │
+│  ○ Pair Device with QR                      │
+│  ○ Install APK                              │
+│  ○ Dev Server (Optional Live Reload)        │
 │  ○ Build & Deploy                           │
 │  ○ Capacitor Setup                          │
 │  ○ Build APK/AAB                            │
@@ -120,6 +126,42 @@ Running `shg` with no arguments opens the interactive TUI:
 Each selection walks you through the necessary prompts — no flags to remember. Use Build & Deploy for the normal bundled verification path; the Dev flow is optional live reload and lets you choose WiFi or USB/Emulator mode and set the port/host interactively.
 
 ## Command Reference
+
+### `shg connect`
+
+Pair Android Wireless debugging without typing either port. This requires Android 11+, current platform-tools, Wireless debugging enabled on the phone, and the phone and computer on the same Wi-Fi network.
+
+```text
+shg connect
+→ open Developer options → Wireless debugging on the phone
+→ choose Pair device with QR code
+→ scan the QR code shown in the SHG terminal
+→ SHG discovers the pairing service, runs adb pair, then connects automatically
+```
+
+SHG stores only the reusable post-pairing endpoint; the temporary QR secret is never saved. If mDNS is unavailable, use `shg devices --wifi` for the manual IP/pairing-code fallback.
+
+### `shg install`
+
+Build, install, and launch an APK. The default is a debug APK; `--release` selects the release variant. A saved paired device is reused automatically.
+
+| Flag | Description |
+|------|-------------|
+| `--release` | Build/install the release APK |
+| `--variant <name>` | Select another Gradle variant |
+| `--flavor <name>` | Select a product flavor |
+| `--device <id>` | Target an exact ADB device |
+| `--no-build` | Install an existing matching APK only |
+| `--no-sync` | Skip web build and Capacitor sync during the build |
+
+```bash
+shg install
+shg install --release
+shg install --release --flavor free --device 192.168.1.25:37123
+shg install --no-build
+```
+
+`shg install` accepts APK output only. Use `shg build --release --aab` for Play Store or bundle distribution.
 
 ### `shg dev`
 

@@ -5,7 +5,7 @@ import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { requireProjectRoot, hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice, getCapacitorDependencyMajorMismatch } from "../core/project.js";
-import { ensureAdb, connectOverWifi, getLanIp, listAndroidDevices } from "../core/android.js";
+import { ensureAdb, connectOverWifi, getLanIp, listAndroidDevices, reconnectSavedWirelessDevice } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 const COMMON_DEV_PORTS = [5173, 4173, 5174, 4174, 3000, 8080];
@@ -241,7 +241,7 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   let wifiTarget: string | undefined;
 
   if (usingWifi) {
-    wifiTarget = await connectOverWifi();
+    wifiTarget = await reconnectSavedWirelessDevice() ?? await connectOverWifi();
     if (!wifiTarget) {
       printLiveReloadDiagnostics(host, port, undefined, "Wi-Fi ADB connection was not ready.");
       return { exitCode: 1 };

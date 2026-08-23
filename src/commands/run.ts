@@ -1,9 +1,10 @@
 import * as p from "@clack/prompts";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join, relative, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { listAndroidDevices, connectOverWifi, loadWifiIp, selectConnectedWifiEndpoint } from "../core/android.js";
+import { findBuiltApk } from "../core/apk.js";
 import { requireProjectRoot, readAppId } from "../core/project.js";
 import { loadState, saveState } from "../core/state.js";
 import type { CommandContext, CommandResult } from "./types.js";
@@ -51,44 +52,7 @@ function readLauncherComponent(projectRoot: string): string | undefined {
   return `${appId}/${normalizeActivityName(appId, activityName)}`;
 }
 
-function findBuiltApk(projectRoot: string, variant: string, flavor: string): string | undefined {
-  const apkRoot = join(projectRoot, "android", "app", "build", "outputs", "apk");
-  if (!existsSync(apkRoot)) return undefined;
-
-  const files: string[] = [];
-  const stack = [apkRoot];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const fullPath = join(current, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith(".apk")) {
-        files.push(fullPath);
-      }
-    }
-  }
-
-  const normalizedFlavor = flavor.toLowerCase();
-  const normalizedVariant = variant.toLowerCase();
-  const matches = files.filter((file) => {
-    const relativePath = relative(apkRoot, file);
-    const segments = relativePath.split(sep).map((segment) => segment.toLowerCase());
-    const directories = segments.slice(0, -1);
-    const fileName = basename(file).toLowerCase();
-    return directories.includes(normalizedVariant)
-      && (!normalizedFlavor || directories.includes(normalizedFlavor))
-      && fileName.endsWith(".apk");
-  });
-
-  return matches
-    .filter((file) => !/androidtest|unaligned|unsigned/i.test(file))
-    .sort((a, b) => a.localeCompare(b))[0];
-}
-
-async function launchInstalledApp(projectRoot: string, device: string): Promise<boolean> {
+export async function launchInstalledApp(projectRoot: string, device: string): Promise<boolean> {
   const appId = readAppId(projectRoot);
   if (!appId) return false;
 
