@@ -11,6 +11,9 @@ import type { CommandContext, CommandResult } from "./types.js";
 
 export function setDeepValue(target: Record<string, unknown>, path: string, value: unknown): void {
   const keys = path.split(".");
+  if (keys.some((key) => !key || key === "__proto__" || key === "prototype" || key === "constructor")) {
+    throw new Error("Unsafe configuration key path.");
+  }
   let current: Record<string, unknown> = target;
   for (let i = 0; i < keys.length - 1; i += 1) {
     const key = keys[i];
@@ -21,6 +24,18 @@ export function setDeepValue(target: Record<string, unknown>, path: string, valu
   }
   current[keys[keys.length - 1]] = value;
 }
+
+const CONFIG_VALUE_TYPES: Record<string, "string" | "boolean"> = {
+  defaultFlow: "string",
+  defaultDeviceId: "string",
+  defaultVariant: "string",
+  defaultFlavor: "string",
+  autoSyncBeforeRun: "boolean",
+  "doctor.autoRunBeforeDeploy": "boolean",
+  "doctor.allowSafeFixes": "boolean",
+  "output.verbose": "boolean",
+  "output.json": "boolean",
+};
 
 export function parseValue(raw: string): string | boolean | number {
   if (raw === "true") return true;
@@ -103,7 +118,17 @@ export async function runConfig(context: CommandContext, rest: string[]): Promis
       scopeConfig = readJsonFile<Record<string, unknown>>(configPath) ?? {};
     }
 
-    setDeepValue(scopeConfig, key, parseValue(rawValue));
+    const expectedType = CONFIG_VALUE_TYPES[key];
+    if (!expectedType) {
+      console.error(chalk.red(`Unknown config key: ${key}`));
+      return { exitCode: 2 };
+    }
+    const value = parseValue(rawValue);
+    if (typeof value !== expectedType || (key === "defaultFlow" && value !== "deployAll")) {
+      console.error(chalk.red(`Invalid value for ${key}; expected ${key === "defaultFlow" ? '"deployAll"' : expectedType}.`));
+      return { exitCode: 2 };
+    }
+    setDeepValue(scopeConfig, key, value);
     writeJsonFile(configPath, scopeConfig);
     console.log(chalk.green(`Updated ${scope} config: ${configPath}`));
     return { exitCode: 0 };

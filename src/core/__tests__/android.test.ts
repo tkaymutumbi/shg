@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseAdbDevices } from "../android.js";
+import { adbConnectSucceeded, normalizeAdbEndpoint, parseAdbDevices } from "../android.js";
 
 describe("parseAdbDevices", () => {
   test("parses device list with model info", () => {
@@ -51,5 +51,31 @@ emulator-5554\toffline
 `;
     const devices = parseAdbDevices(output);
     expect(devices[0].status).toBe("unauthorized");
+  });
+});
+
+describe("adbConnectSucceeded", () => {
+  test("rejects adb's zero-exit connection failures", () => {
+    expect(adbConnectSucceeded({ success: true, stdout: "failed to connect: Connection refused", stderr: "" })).toBe(false);
+  });
+
+  test("accepts connected and already-connected responses", () => {
+    expect(adbConnectSucceeded({ success: true, stdout: "connected to 192.168.1.2:5555", stderr: "" })).toBe(true);
+    expect(adbConnectSucceeded({ success: true, stdout: "already connected to 192.168.1.2:5555", stderr: "" })).toBe(true);
+  });
+});
+
+describe("normalizeAdbEndpoint", () => {
+  test("defaults legacy connections to port 5555", () => {
+    expect(normalizeAdbEndpoint("192.168.1.22")).toBe("192.168.1.22:5555");
+  });
+
+  test("preserves Android Wireless debugging ports", () => {
+    expect(normalizeAdbEndpoint("192.168.1.22:37123")).toBe("192.168.1.22:37123");
+  });
+
+  test("rejects invalid endpoints", () => {
+    expect(normalizeAdbEndpoint("192.168.1.22:99999")).toBeUndefined();
+    expect(normalizeAdbEndpoint("bad host")).toBeUndefined();
   });
 });

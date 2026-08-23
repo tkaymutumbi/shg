@@ -52,16 +52,29 @@ export function mergeConfig(base: ShgConfig, override?: Partial<ShgConfig>): Shg
     return base;
   }
 
+  const safe: Partial<ShgConfig> = {};
+  if (override.defaultFlow === "deployAll") safe.defaultFlow = override.defaultFlow;
+  if (typeof override.defaultDeviceId === "string") safe.defaultDeviceId = override.defaultDeviceId;
+  if (typeof override.defaultVariant === "string") safe.defaultVariant = override.defaultVariant;
+  if (typeof override.defaultFlavor === "string") safe.defaultFlavor = override.defaultFlavor;
+  if (typeof override.autoSyncBeforeRun === "boolean") safe.autoSyncBeforeRun = override.autoSyncBeforeRun;
+
   return {
     ...base,
-    ...override,
+    ...safe,
     doctor: {
       ...base.doctor,
-      ...(override.doctor ?? {}),
+      ...(typeof override.doctor?.autoRunBeforeDeploy === "boolean"
+        ? { autoRunBeforeDeploy: override.doctor.autoRunBeforeDeploy }
+        : {}),
+      ...(typeof override.doctor?.allowSafeFixes === "boolean"
+        ? { allowSafeFixes: override.doctor.allowSafeFixes }
+        : {}),
     },
     output: {
       ...base.output,
-      ...(override.output ?? {}),
+      ...(typeof override.output?.verbose === "boolean" ? { verbose: override.output.verbose } : {}),
+      ...(typeof override.output?.json === "boolean" ? { json: override.output.json } : {}),
     },
   };
 }

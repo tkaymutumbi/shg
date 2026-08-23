@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, unlinkSync, symlinkSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import * as p from "@clack/prompts";
 import chalk from "chalk";
@@ -54,18 +53,24 @@ function parseJavaMajor(versionOutput: string): number | undefined {
 }
 
 async function checkGradle(context: CommandContext): Promise<DoctorCheck> {
-  const gradleResult = await runCommand(
-    { label: "gradle --version", cmd: "gradle", args: ["--version"] },
-    { stdio: "pipe" },
-  );
-
-  if (gradleResult.success) {
-    const snippet = (gradleResult.stdout || gradleResult.stderr).split(/\r?\n/)[0] ?? "available";
-    return { id: "gradle", title: "Gradle", status: "pass", details: snippet.trim() };
-  }
+  const fromOutput = (output: string, wrapper: boolean): DoctorCheck => {
+    const major = Number.parseInt(output.match(/Gradle\s+(\d+)/i)?.[1] ?? "", 10);
+    const tooOld = Number.isFinite(major) && major < MIN_GRADLE_VERSION;
+    return {
+      id: "gradle",
+      title: "Gradle",
+      status: !Number.isFinite(major) ? "warn" : tooOld ? "fail" : "pass",
+      details: `${output.match(/Gradle\s+[^\s]+/i)?.[0] ?? "Gradle available"}${wrapper ? " (via wrapper)" : ""}`,
+      fix: !Number.isFinite(major)
+        ? "Could not determine the Gradle version; run `gradle --version` manually."
+        : tooOld
+        ? wrapper ? `Update the Gradle wrapper to ${MIN_GRADLE_VERSION}+.` : `Upgrade Gradle to ${MIN_GRADLE_VERSION}+.`
+        : undefined,
+    };
+  };
 
   if (context.projectRoot) {
-    const gradlewPath = join(context.projectRoot, "android", "gradlew");
+    const gradlewPath = join(context.projectRoot, "android", process.platform === "win32" ? "gradlew.bat" : "gradlew");
     if (existsSync(gradlewPath)) {
       const wrapperResult = await runCommand(
         { label: "gradlew --version", cmd: gradlewPath, args: ["--version"] },
@@ -73,30 +78,16 @@ async function checkGradle(context: CommandContext): Promise<DoctorCheck> {
       );
 
       if (wrapperResult.success) {
-        const snippet = (wrapperResult.stdout || wrapperResult.stderr).split(/\r?\n/)[0] ?? "available";
-        return {
-          id: "gradle",
-          title: "Gradle",
-          status: "pass",
-          details: `${snippet.trim()} (via wrapper)`,
-          fix: "Add Gradle to PATH for faster startup, or continue using the wrapper.",
-          safeFix: async () => {
-            const binDir = join(homedir(), ".local", "bin");
-            mkdirSync(binDir, { recursive: true });
-            const linkPath = join(binDir, "gradle");
-            try {
-              if (existsSync(linkPath)) unlinkSync(linkPath);
-              symlinkSync(gradlewPath, linkPath);
-              console.log(chalk.green(`  Linked gradlew → ${linkPath}`));
-              console.log(chalk.dim(`  Ensure ${binDir} is on your PATH.`));
-            } catch {
-              console.log(chalk.yellow("  Could not create symlink."));
-            }
-          },
-        };
+        return fromOutput(wrapperResult.stdout || wrapperResult.stderr, true);
       }
     }
   }
+
+  const gradleResult = await runCommand(
+    { label: "gradle --version", cmd: "gradle", args: ["--version"] },
+    { stdio: "pipe" },
+  );
+  if (gradleResult.success) return fromOutput(gradleResult.stdout || gradleResult.stderr, false);
 
   return {
     id: "gradle",
@@ -109,7 +100,13 @@ async function checkGradle(context: CommandContext): Promise<DoctorCheck> {
 
 export async function runDoctor(context: CommandContext): Promise<CommandResult> {
   const checks: DoctorCheck[] = [];
-  const fixEnabled = Boolean(context.flags.fix) || context.config.doctor.allowSafeFixes;
+  const silent = Boolean(context.flags.__silent);
+  const json = Boolean(context.json || context.flags.json);
+  if (json && context.flags.fix && !silent) {
+    emitJson({ success: false, error: "--json and --fix cannot be combined because fixes may require interactive input." });
+    return { exitCode: 2 };
+  }
+  const fixEnabled = !silent && !json && (Boolean(context.flags.fix) || context.config.doctor.allowSafeFixes);
 
   checks.push(
     await checkCommandVersion(
@@ -146,8 +143,10 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
   let sdkFix = "Export ANDROID_SDK_ROOT pointing to a valid Android SDK installation.";
   if (sdkRoot) {
     const platformsDir = join(sdkRoot, "platforms");
-    sdkStatus = existsSync(platformsDir) ? "pass" : "warn";
-    sdkDetails = existsSync(platformsDir) ? sdkRoot : `${sdkRoot} (platforms/ missing)`;
+    const hasPlatform = existsSync(platformsDir)
+      && readdirSync(platformsDir).some((name) => name.startsWith("android-"));
+    sdkStatus = hasPlatform ? "pass" : "warn";
+    sdkDetails = hasPlatform ? sdkRoot : `${sdkRoot} (no installed Android platforms)`;
   } else {
     const found = findAndroidSdkRoot();
     if (found) {
@@ -168,22 +167,25 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
 
   if (adbCheck.status === "pass") {
     const devices = await listAndroidDevices();
-    if (devices.length === 0) {
+    const readyDevices = devices.filter((device) => device.status === "device");
+    if (readyDevices.length === 0) {
       checks.push({
         id: "device",
         title: "Android device connected",
         status: "warn",
-        details: "No devices found",
+        details: devices.length === 0
+          ? "No devices found"
+          : `No ready devices: ${devices.map((device) => `${device.id} (${device.status})`).join(", ")}`,
         fix: "Connect a device via USB, or use `shg doctor --fix` to connect wirelessly.",
         safeFix: async () => { await connectOverWifi(); },
       });
     } else {
-      const deviceList = devices.map((d) => `${d.id} (${d.status})`).join(", ");
+      const deviceList = readyDevices.map((d) => `${d.id} (${d.status})`).join(", ");
       checks.push({
         id: "device",
         title: "Android device connected",
         status: "pass",
-        details: `${devices.length} device(s): ${deviceList}`,
+        details: `${readyDevices.length} ready device(s): ${deviceList}`,
       });
     }
   }
@@ -250,10 +252,13 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
           installCheck.details = `Capacitor package majors do not match: ${Object.entries(mismatch.versions).map(([name, version]) => `${name}=${version}`).join(", ")}`;
           installCheck.fix = "Align @capacitor/core, @capacitor/cli, and platform packages to the same major version, then run `bun install && bunx cap sync android`.";
         } else {
-          installCheck.status = "pass";
-          installCheck.details = Object.keys(versions).length > 0
-            ? Object.entries(versions).map(([name, version]) => `${name}=${version}`).join(", ")
-            : "@capacitor packages detected";
+          if (Object.keys(versions).length === 0) {
+            installCheck.status = "fail";
+            installCheck.details = "No @capacitor packages declared in package.json";
+          } else {
+            installCheck.status = "pass";
+            installCheck.details = Object.entries(versions).map(([name, version]) => `${name}=${version}`).join(", ");
+          }
         }
       } else {
         installCheck.status = "warn";
@@ -302,7 +307,9 @@ export async function runDoctor(context: CommandContext): Promise<CommandResult>
     }
   }
 
-  if (context.json || context.flags.json) {
+  if (silent) {
+    // The caller owns the final machine-readable output.
+  } else if (json) {
     emitJson({
       checks: checks.map((check) => ({
         id: check.id,

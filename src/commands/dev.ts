@@ -77,6 +77,17 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   let host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? (getLanIp() ?? "0.0.0.0") : "localhost");
   let port = typeof context.flags.port === "string" ? context.flags.port : "5173";
   const explicitPort = typeof context.flags.port === "string";
+  const portNumber = Number(port);
+  if (!host.trim()) {
+    console.error(chalk.red("Host cannot be empty."));
+    return { exitCode: 2 };
+  }
+  host = host.trim();
+  if (!Number.isInteger(portNumber) || portNumber < 1 || portNumber > 65535) {
+    console.error(chalk.red(`Invalid port "${port}". Expected an integer between 1 and 65535.`));
+    return { exitCode: 2 };
+  }
+  port = String(portNumber);
 
   const adbOk = await ensureAdb();
   if (!adbOk) {

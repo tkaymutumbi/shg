@@ -70,9 +70,9 @@ Commands:
   deploy                  Build/sync/run flows
   setup                   Setup capacitor dependencies and platform
   run                     Run Android app with optional targeting
-  build                   Build APK/AAB (debug/release)
+  build                   Build APK/AAB (debug/release; use --aab or --both)
   clean                   Clean project build artifacts
-  devices                 List Android devices from adb
+  devices                 List devices or connect over WiFi with --wifi
   logs                    Tail logcat with Capacitor filter
   plugin                  Add/list/sync Capacitor plugins
   assets                  Generate app icons and splash screens
@@ -90,6 +90,7 @@ Examples:
   shg setup --install --add-android
   shg run --device emulator-5554
   shg build --release
+  shg build --release --aab
   shg clean
   shg devices --json
   shg logs --tag Capacitor --level D

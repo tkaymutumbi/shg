@@ -33,4 +33,16 @@ describe("mergeConfig", () => {
     const result = mergeConfig(DEFAULT_CONFIG, {});
     expect(result).toEqual(DEFAULT_CONFIG);
   });
+
+  test("ignores invalid runtime value types", () => {
+    const malformed = {
+      defaultVariant: 42,
+      autoSyncBeforeRun: "yes",
+      doctor: { autoRunBeforeDeploy: "yes" },
+    } as unknown as Partial<typeof DEFAULT_CONFIG>;
+    const merged = mergeConfig(DEFAULT_CONFIG, malformed);
+    expect(merged.defaultVariant).toBe("debug");
+    expect(merged.autoSyncBeforeRun).toBe(true);
+    expect(merged.doctor.autoRunBeforeDeploy).toBe(true);
+  });
 });

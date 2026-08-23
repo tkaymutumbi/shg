@@ -15,6 +15,11 @@ const SHORT_FLAG_MAP: Record<string, string> = {
 };
 
 const VALUE_FLAGS = new Set(["device", "variant", "flavor", "host", "port", "tag", "level", "to", "platform"]);
+const BOOLEAN_FLAGS = new Set([
+  "help", "version", "verbose", "json", "wifi", "skip-build", "fix",
+  "all", "build", "sync", "run", "install", "init", "update",
+  "add-android", "release", "no-sync", "global", "aab", "apk", "both",
+]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const flags: Record<string, string | boolean> = {};
@@ -32,8 +37,14 @@ export function parseArgs(argv: string[]): ParsedArgs {
         continue;
       }
 
+      if (!VALUE_FLAGS.has(name) && !BOOLEAN_FLAGS.has(name)) {
+        errors.push(`Unknown flag: --${name}`);
+        continue;
+      }
+
       if (inlineValue !== undefined) {
-        flags[name] = inlineValue;
+        if (VALUE_FLAGS.has(name)) flags[name] = inlineValue;
+        else errors.push(`Flag --${name} does not take a value`);
         continue;
       }
 

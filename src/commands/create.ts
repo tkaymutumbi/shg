@@ -33,7 +33,8 @@ export function formatAppName(name: string): string {
 }
 
 export function sanitizePackageName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || "app";
+  const sanitized = name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || "app";
+  return /^\d/.test(sanitized) ? `app${sanitized}` : sanitized;
 }
 
 export async function runCreate(context: CommandContext, rest?: string[]): Promise<CommandResult> {

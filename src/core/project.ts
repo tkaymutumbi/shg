@@ -229,7 +229,9 @@ export async function hasConnectedDevice(): Promise<boolean> {
 
 export function requireProjectRoot(context: CommandContext, commandName: string): string | undefined {
   if (!context.projectRoot) {
-    console.error(chalk.red(`${commandName} command requires a Capacitor project root.`));
+    const message = `${commandName} command requires a Capacitor project root.`;
+    if (context.json || context.flags.json) emitJson({ success: false, error: message });
+    else console.error(chalk.red(message));
     return undefined;
   }
   return context.projectRoot;

@@ -95,6 +95,11 @@ describe("runDevices", () => {
     const result = await runDevices(makeContext({ json: true }));
     expect(result.exitCode).toBe(0);
   });
+
+  test("rejects interactive WiFi setup in json mode", async () => {
+    const result = await runDevices(makeContext({ json: true, flags: { wifi: true } }));
+    expect(result.exitCode).toBe(2);
+  });
 });
 
 describe("runLogs", () => {
@@ -175,6 +180,11 @@ describe("runDoctor", () => {
     expect(result.exitCode).toBe(0);
   });
 
+  test("rejects interactive fixes in json mode", async () => {
+    const result = await runDoctor(makeContext({ json: true, flags: { fix: true } }));
+    expect(result.exitCode).toBe(2);
+  });
+
   test("no project root", async () => {
     const result = await runDoctor(makeContext({ projectRoot: undefined }));
     expect(result.exitCode).toBe(1);
@@ -246,6 +256,11 @@ describe("runPlugin", () => {
 
   test("errors without plugin name on add", async () => {
     const result = await runPlugin(makeContext(), ["add"]);
+    expect(result.exitCode).toBe(2);
+  });
+
+  test("errors on an unknown plugin subcommand", async () => {
+    const result = await runPlugin(makeContext(), ["remove"]);
     expect(result.exitCode).toBe(2);
   });
 });

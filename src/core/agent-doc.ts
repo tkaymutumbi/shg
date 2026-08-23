@@ -20,7 +20,7 @@ SHG is a CLI tool that streamlines Capacitor Android development: building, sync
 | \`shg run\` | Run Android app with optional device targeting |
 | \`shg build\` | Build APK/AAB (debug or release) |
 | \`shg clean\` | Clean project build artifacts |
-| \`shg devices\` | List connected Android devices from ADB |
+| \`shg devices\` | List devices or connect/pair over WiFi with \`--wifi\` |
 | \`shg logs\` | Tail logcat with Capacitor filter |
 | \`shg plugin\` | Add/list/sync Capacitor plugins |
 | \`shg assets\` | Generate app icons and splash screens |
@@ -62,8 +62,9 @@ shg setup --install --add-android
 # Diagnostics
 shg doctor --fix
 
-# Build release APK
+# Build release APK or AAB
 shg build --release
+shg build --release --aab
 
 # View logs
 shg logs --tag Capacitor --level D

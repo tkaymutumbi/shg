@@ -12,6 +12,11 @@ export async function runPlugin(context: CommandContext, rest: string[] = []): P
   const subcommand = (rest[0] ?? "list") as PluginSubcommand;
   const name = rest[1];
 
+  if (!["add", "list", "sync"].includes(subcommand)) {
+    console.error(chalk.red(`Unknown plugin subcommand: ${subcommand}`));
+    return { exitCode: 2 };
+  }
+
   if (subcommand === "add") {
     if (!name) {
       console.error(chalk.red("Usage: shg plugin add <package-name>"));
@@ -54,8 +59,9 @@ export async function runPlugin(context: CommandContext, rest: string[] = []): P
     );
     emitJson({
       plugins: lsResult.success ? (lsResult.stdout || "").trim().split("\n") : [],
+      success: lsResult.success,
     });
-    return { exitCode: 0 };
+    return { exitCode: lsResult.success ? 0 : 1 };
   }
 
   console.log(chalk.cyan("\nCapacitor Plugins\n"));
@@ -70,5 +76,5 @@ export async function runPlugin(context: CommandContext, rest: string[] = []): P
     console.log(chalk.yellow("No Capacitor packages installed."));
   }
 
-  return { exitCode: 0 };
+  return { exitCode: lsResult.success ? 0 : 1 };
 }

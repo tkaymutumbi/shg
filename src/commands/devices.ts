@@ -1,9 +1,16 @@
 import chalk from "chalk";
-import { listAndroidDevices } from "../core/android.js";
+import { connectOverWifi, ensureAdb, listAndroidDevices } from "../core/android.js";
 import { emitJson } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDevices(context: CommandContext): Promise<CommandResult> {
+  if (context.flags.wifi && (context.json || context.flags.json)) {
+    emitJson({ success: false, error: "--json and --wifi cannot be combined because WiFi setup may require interactive input." });
+    return { exitCode: 2 };
+  }
+  if (context.flags.wifi) {
+    if (!await ensureAdb() || !await connectOverWifi()) return { exitCode: 1 };
+  }
   const devices = await listAndroidDevices();
 
   if (context.json || context.flags.json) {

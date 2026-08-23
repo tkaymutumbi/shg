@@ -40,8 +40,12 @@ function readLauncherComponent(projectRoot: string): string | undefined {
   if (!appId) return undefined;
 
   const manifest = readFileSync(manifestPath, "utf8");
-  const launcherBlock = manifest.match(/<(activity|activity-alias)\b[\s\S]*?<intent-filter>[\s\S]*?android\.intent\.action\.MAIN[\s\S]*?android\.intent\.category\.LAUNCHER[\s\S]*?<\/intent-filter>[\s\S]*?<\/\1>/);
-  const activityName = launcherBlock?.[0].match(/android:name\s*=\s*["']([^"']+)["']/)?.[1];
+  const blocks = manifest.match(/<(activity|activity-alias)\b[\s\S]*?<\/\1>/g) ?? [];
+  const launcherBlock = blocks.find((block) => (
+    /android\.intent\.action\.MAIN/.test(block)
+    && /android\.intent\.category\.LAUNCHER/.test(block)
+  ));
+  const activityName = launcherBlock?.match(/android:name\s*=\s*["']([^"']+)["']/)?.[1];
   if (!activityName) return undefined;
 
   return `${appId}/${normalizeActivityName(appId, activityName)}`;
@@ -75,7 +79,34 @@ function findBuiltApk(projectRoot: string, variant: string, flavor: string): str
       && (!normalizedFlavor || normalizedPath.includes(normalizedFlavor));
   });
 
-  return matches.sort((a, b) => b.length - a.length)[0] ?? files.sort((a, b) => b.length - a.length)[0];
+  return matches
+    .filter((file) => !/androidtest|unaligned|unsigned/i.test(file))
+    .sort((a, b) => a.localeCompare(b))[0];
+}
+
+async function launchInstalledApp(projectRoot: string, device: string): Promise<boolean> {
+  const appId = readAppId(projectRoot);
+  if (!appId) return false;
+
+  let component = readLauncherComponent(projectRoot);
+  if (!component) {
+    const resolved = await runCommand(
+      {
+        label: "adb resolve launcher activity",
+        cmd: "adb",
+        args: ["-s", device, "shell", "cmd", "package", "resolve-activity", "--brief", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", appId],
+      },
+      { stdio: "pipe" },
+    );
+    component = resolved.stdout.split(/\r?\n/).map((line) => line.trim()).find((line) => line.includes("/"));
+  }
+  if (!component) return false;
+
+  const launched = await runCommand(
+    { label: "adb shell am start", cmd: "adb", args: ["-s", device, "shell", "am", "start", "-n", component] },
+    { stdio: "pipe" },
+  );
+  return launched.success;
 }
 
 function formatDeviceList(devices: { id: string; status: string; model?: string }[]): string {
@@ -89,6 +120,9 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   if (!projectRoot) return { exitCode: 1 };
 
   const { device, variant, flavor } = resolveRunValues(projectRoot, context);
+  const quiet = Boolean(context.flags.__silent);
+  const log = (...args: unknown[]) => { if (!quiet) console.log(...args); };
+  const error = (...args: unknown[]) => { if (!quiet) console.error(...args); };
 
   let devices = await listAndroidDevices();
   let readyDevices = devices.filter((d) => d.status === "device");
@@ -101,10 +135,12 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   if (resolvedTarget && !requestedDeviceConnected) {
     if (readyDevices.length === 0) {
       const savedIp = loadWifiIp();
-      const shouldReconnect = await p.confirm({
+      const shouldReconnect = quiet ? false : await p.confirm({
         message: `Target device "${resolvedTarget}" is not connected${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try WiFi reconnect?`,
         initialValue: true,
       });
+
+      if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
 
       if (shouldReconnect) {
         const ok = await connectOverWifi();
@@ -116,18 +152,20 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     }
 
     if (!readyDevices.some((d) => d.id === resolvedTarget)) {
-      console.error(chalk.red(`Target device "${resolvedTarget}" not found.`));
-      console.log(chalk.dim(`Available: ${formatDeviceList(devices)}`));
+      error(chalk.red(`Target device "${resolvedTarget}" not found.`));
+      log(chalk.dim(`Available: ${formatDeviceList(devices)}`));
       return { exitCode: 1 };
     }
   }
 
   if (!resolvedTarget && readyDevices.length === 0) {
     const savedIp = loadWifiIp();
-    const shouldReconnect = await p.confirm({
+    const shouldReconnect = quiet ? false : await p.confirm({
       message: `No ready Android device found${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try to connect over WiFi?`,
       initialValue: true,
     });
+
+    if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
 
     if (shouldReconnect) {
       const ok = await connectOverWifi();
@@ -138,12 +176,12 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     }
 
     if (readyDevices.length === 0) {
-      console.error(chalk.red("No Android device is ready for deployment."));
+      error(chalk.red("No Android device is ready for deployment."));
       if (devices.length > 0) {
-        console.log(chalk.dim(`ADB sees: ${formatDeviceList(devices)}`));
-        console.log(chalk.yellow("Tip: authorize the phone on-device, reconnect USB, or run `adb connect <phone-ip>:5555`."));
+        log(chalk.dim(`ADB sees: ${formatDeviceList(devices)}`));
+        log(chalk.yellow("Tip: authorize the phone on-device, reconnect USB, or run `adb connect <phone-ip>:5555`."));
       } else {
-        console.log(chalk.yellow("Tip: connect a phone with USB debugging enabled, or use WiFi ADB with `adb connect <phone-ip>:5555`."));
+        log(chalk.yellow("Tip: connect a phone with USB debugging enabled, or use WiFi ADB with `adb connect <phone-ip>:5555`."));
       }
       return { exitCode: 1 };
     }
@@ -161,7 +199,7 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
           args: ["cap", "sync", "android"],
           cwd: projectRoot,
         },
-        { verbose: context.verbose, stdio: "inherit" },
+        { verbose: context.verbose && !quiet, stdio: quiet ? "pipe" : "inherit" },
       );
 
     if (!syncResult.success) {
@@ -187,12 +225,12 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
       args,
       cwd: projectRoot,
     },
-    { verbose: context.verbose, stdio: "inherit" },
+    { verbose: context.verbose && !quiet, stdio: quiet ? "pipe" : "inherit" },
   );
 
   if (!result.success) {
     const wifiTarget = resolvedTarget?.includes(":") ? resolvedTarget : undefined;
-    if (wifiTarget) {
+    if (wifiTarget && !quiet) {
       const deviceCheck = await runCommand(
         { label: "adb devices", cmd: "adb", args: ["devices", "-l"] },
         { stdio: "pipe" },
@@ -200,36 +238,23 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
       const deviceGone = !deviceCheck.stdout.includes(wifiTarget);
 
       if (deviceGone) {
-        console.log(chalk.yellow("\nWiFi connection dropped during deploy. Reconnecting...\n"));
+        log(chalk.yellow("\nWiFi connection dropped during deploy. Reconnecting...\n"));
         const reconnected = await connectOverWifi();
         if (reconnected) {
-          const launcherComponent = readLauncherComponent(projectRoot);
-          if (launcherComponent) {
-            console.log(chalk.dim("App was already installed. Re-launching...\n"));
-            const relaunchResult = await runCommand(
-              {
-                label: "adb shell am start",
-                cmd: "adb",
-                args: ["-s", wifiTarget, "shell", "am", "start", "-n", launcherComponent],
-                cwd: projectRoot,
-              },
-              { stdio: "inherit" },
-            );
-
-            if (relaunchResult.success) {
-              console.log(chalk.green("App re-launched successfully after reconnection.\n"));
-              saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
-              return { exitCode: 0 };
-            }
+          log(chalk.dim("App was already installed. Re-launching...\n"));
+          if (await launchInstalledApp(projectRoot, wifiTarget)) {
+            log(chalk.green("App re-launched successfully after reconnection.\n"));
+            saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
+            return { exitCode: 0 };
           }
 
           const apkPath = findBuiltApk(projectRoot, variant, flavor);
           if (!apkPath) {
-            console.error(chalk.red("Could not find a built APK to reinstall after reconnecting."));
+            error(chalk.red("Could not find a matching built APK to reinstall after reconnecting."));
             return { exitCode: 1 };
           }
 
-          console.log(chalk.yellow("Could not re-launch. Trying re-install...\n"));
+          log(chalk.yellow("Could not re-launch. Trying re-install...\n"));
           const reinstallResult = await runCommand(
             {
               label: "adb install -r",
@@ -241,9 +266,12 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
           );
 
           if (reinstallResult.success) {
-            console.log(chalk.green("App re-installed and will launch automatically.\n"));
-            saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
-            return { exitCode: 0 };
+            if (await launchInstalledApp(projectRoot, wifiTarget)) {
+              log(chalk.green("App re-installed and launched successfully.\n"));
+              saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
+              return { exitCode: 0 };
+            }
+            error(chalk.red("App was re-installed, but its launcher activity could not be started."));
           }
         }
       }
@@ -258,6 +286,6 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     lastFlavor: flavor,
   });
 
-  console.log(chalk.green("Run complete."));
+  log(chalk.green("Run complete."));
   return { exitCode: 0 };
 }

@@ -7,66 +7,87 @@ export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+export function getGradleBuildTasks(variant: string, flavor: string | undefined, artifacts: Array<"apk" | "aab">): string[] {
+  return artifacts.map((artifact) => {
+    const prefix = artifact === "aab" ? "bundle" : "assemble";
+    return flavor
+      ? `${prefix}${capitalize(flavor)}${capitalize(variant)}`
+      : `${prefix}${capitalize(variant)}`;
+  });
+}
+
 export async function runBuild(context: CommandContext): Promise<CommandResult> {
   const projectRoot = requireProjectRoot(context, "Build");
   if (!projectRoot) return { exitCode: 1 };
+  const json = Boolean(context.json || context.flags.json);
 
   const release = Boolean(context.flags.release);
   const variantFlag = typeof context.flags.variant === "string" ? context.flags.variant : undefined;
   if (release && variantFlag && variantFlag !== "release") {
-    console.error(chalk.red('Conflicting flags: --release cannot be combined with --variant values other than "release".'));
+    const message = 'Conflicting flags: --release cannot be combined with --variant values other than "release".';
+    if (json) emitJson({ success: false, error: message });
+    else console.error(chalk.red(message));
     return { exitCode: 1 };
   }
 
   const variant = variantFlag ?? (release ? "release" : "debug");
   const flavor = typeof context.flags.flavor === "string" ? context.flags.flavor : undefined;
+  const artifactKinds: Array<"apk" | "aab"> = context.flags.both || (context.flags.aab && context.flags.apk)
+    ? ["apk", "aab"]
+    : context.flags.aab
+      ? ["aab"]
+      : ["apk"];
 
   if (!context.flags["no-sync"]) {
     if (!webDirExists(projectRoot)) {
-      console.log(chalk.yellow("Web assets not found. Running web build..."));
+      if (!json) console.log(chalk.yellow("Web assets not found. Running web build..."));
       const webBuild = await runCommand(
         { label: "bun run build", cmd: "bun", args: ["run", "build"], cwd: projectRoot },
-        { verbose: context.verbose, stdio: "inherit" },
+        { verbose: context.verbose && !json, stdio: json ? "pipe" : "inherit" },
       );
       if (!webBuild.success) {
-        console.error(chalk.red("Web build failed."));
+        if (json) emitJson({ success: false, step: "web-build", error: webBuild.stderr || webBuild.errorMessage });
+        else console.error(chalk.red("Web build failed."));
         return { exitCode: 1 };
       }
     }
 
-    console.log(chalk.yellow("Syncing web assets to Android project..."));
+    if (!json) console.log(chalk.yellow("Syncing web assets to Android project..."));
     const syncResult = await runCommand(
       { label: "bunx cap sync android", cmd: "bunx", args: ["cap", "sync", "android"], cwd: projectRoot },
-      { verbose: context.verbose, stdio: "inherit" },
+      { verbose: context.verbose && !json, stdio: json ? "pipe" : "inherit" },
     );
     if (!syncResult.success) {
-      console.error(chalk.red("Capacitor sync failed."));
+      if (json) emitJson({ success: false, step: "sync", error: syncResult.stderr || syncResult.errorMessage });
+      else console.error(chalk.red("Capacitor sync failed."));
       return { exitCode: 1 };
     }
   }
 
   const androidDir = `${projectRoot}/android`;
   const gradlew = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-  const task = flavor
-    ? `assemble${capitalize(flavor)}${capitalize(variant)}`
-    : `assemble${capitalize(variant)}`;
+  const tasks = getGradleBuildTasks(variant, flavor, artifactKinds);
+  for (const [index, artifact] of artifactKinds.entries()) {
+    const task = tasks[index];
 
-  console.log(chalk.cyan(`\nBuilding Android ${variant} APK...\n`));
+    if (!json) console.log(chalk.cyan(`\nBuilding Android ${variant} ${artifact.toUpperCase()}...\n`));
 
-  const result = await runCommand(
-    { label: `./gradlew ${task}`, cmd: gradlew, args: [task], cwd: androidDir },
-    { verbose: context.verbose, stdio: "inherit" },
-  );
+    const result = await runCommand(
+      { label: `./gradlew ${task}`, cmd: gradlew, args: [task], cwd: androidDir },
+      { verbose: context.verbose && !json, stdio: json ? "pipe" : "inherit" },
+    );
 
-  if (!result.success) {
-    console.error(chalk.red("Build failed."));
-    return { exitCode: 1 };
+    if (!result.success) {
+      if (json) emitJson({ success: false, step: "gradle", task, error: result.stderr || result.errorMessage });
+      else console.error(chalk.red("Build failed."));
+      return { exitCode: 1 };
+    }
   }
 
-  console.log(chalk.green(`Build complete (${variant}).`));
+  if (!json) console.log(chalk.green(`Build complete (${variant}).`));
 
-  if (context.json || context.flags.json) {
-    emitJson({ variant, flavor, success: true });
+  if (json) {
+    emitJson({ variant, flavor, artifacts: artifactKinds, success: true });
   }
 
   return { exitCode: 0 };

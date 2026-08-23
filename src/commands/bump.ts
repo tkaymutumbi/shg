@@ -10,14 +10,21 @@ interface VersionInfo {
 }
 
 export function parseVersion(input: string): VersionInfo {
-  const clean = input.replace(/^v/, "");
-  const parts = clean.split(".");
-  const major = parseInt(parts[0] ?? "1", 10);
-  const minor = parseInt(parts[1] ?? "0", 10);
-  const patch = parseInt(parts[2] ?? "0", 10);
+  const match = input.trim().match(/^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?$/);
+  if (!match) throw new Error(`Invalid version "${input}". Expected MAJOR, MAJOR.MINOR, or MAJOR.MINOR.PATCH.`);
+  const major = Number.parseInt(match[1], 10);
+  const minor = Number.parseInt(match[2] ?? "0", 10);
+  const patch = Number.parseInt(match[3] ?? "0", 10);
+  if (minor > 99 || patch > 99) {
+    throw new Error("Minor and patch versions must be between 0 and 99.");
+  }
+  const versionCode = major * 10000 + minor * 100 + patch;
+  if (!Number.isSafeInteger(versionCode) || versionCode > 2_100_000_000) {
+    throw new Error("Version is too large for an Android versionCode.");
+  }
   return {
     versionName: `${major}.${minor}.${patch}`,
-    versionCode: major * 10000 + minor * 100 + patch,
+    versionCode,
   };
 }
 
@@ -42,11 +49,15 @@ function readCurrentVersion(capacitorConfigPath: string): VersionInfo | null {
 
 function updateCapacitorConfig(path: string, version: VersionInfo): boolean {
   try {
-    let content = readFileSync(path, "utf8");
-    content = content.replace(/["']?version["']?\s*[:=]\s*["'][^"']+["']/, `"version": "${version.versionName}"`);
-    content = content.replace(/["']?versionName["']?\s*[:=]\s*["'][^"']+["']/, `"versionName": "${version.versionName}"`);
-    content = content.replace(/["']?versionCode["']?\s*[:=]\s*\d+/, `"versionCode": ${version.versionCode}`);
-    writeFileSync(path, content, "utf8");
+    const original = readFileSync(path, "utf8");
+    if (!path.endsWith(".json")) return false;
+    const parsed = JSON.parse(original) as Record<string, unknown>;
+    let changed = false;
+    if ("version" in parsed) { parsed.version = version.versionName; changed = true; }
+    if ("versionName" in parsed) { parsed.versionName = version.versionName; changed = true; }
+    if ("versionCode" in parsed) { parsed.versionCode = version.versionCode; changed = true; }
+    if (!changed) return false;
+    writeFileSync(path, JSON.stringify(parsed, null, 2) + "\n", "utf8");
     return true;
   } catch {
     return false;
@@ -55,9 +66,11 @@ function updateCapacitorConfig(path: string, version: VersionInfo): boolean {
 
 function updateBuildGradle(path: string, version: VersionInfo): boolean {
   try {
-    let content = readFileSync(path, "utf8");
-    content = content.replace(/versionName\s+"[^"]+"/, `versionName "${version.versionName}"`);
-    content = content.replace(/versionCode\s+\d+/, `versionCode ${version.versionCode}`);
+    const original = readFileSync(path, "utf8");
+    let content = original;
+    content = content.replace(/(versionName\s*(?:=\s*)?)["'][^"']+["']/, `$1"${version.versionName}"`);
+    content = content.replace(/(versionCode\s*(?:=\s*)?)\d+/, `$1${version.versionCode}`);
+    if (content === original) return false;
     writeFileSync(path, content, "utf8");
     return true;
   } catch {
@@ -68,37 +81,57 @@ function updateBuildGradle(path: string, version: VersionInfo): boolean {
 export async function runBump(context: CommandContext): Promise<CommandResult> {
   const projectRoot = requireProjectRoot(context, "Bump");
   if (!projectRoot) return { exitCode: 1 };
+  const json = Boolean(context.json || context.flags.json);
 
   const rawVersion = typeof context.flags.to === "string" ? context.flags.to : undefined;
 
   let version: VersionInfo;
 
   if (rawVersion) {
-    version = parseVersion(rawVersion);
+    try {
+      version = parseVersion(rawVersion);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid version.";
+      if (json) emitJson({ success: false, error: message });
+      else console.error(chalk.red(message));
+      return { exitCode: 2 };
+    }
   } else {
     const capacitorConfig = CONFIG_FILES
       .map((f) => join(projectRoot, f))
       .find((f) => existsSync(f));
 
     if (!capacitorConfig) {
-      console.error(chalk.red("No capacitor.config.* file found to read current version."));
+      const message = "No capacitor.config.* file found to read current version.";
+      if (json) emitJson({ success: false, error: message });
+      else console.error(chalk.red(message));
       return { exitCode: 1 };
     }
 
     const current = readCurrentVersion(capacitorConfig);
     if (!current) {
-      console.error(chalk.red("Could not parse current version from capacitor.config.*"));
+      const message = "Could not parse current version from capacitor.config.*";
+      if (json) emitJson({ success: false, error: message });
+      else console.error(chalk.red(message));
       return { exitCode: 1 };
     }
 
-    const parsed = parseVersion(current.versionName);
+    let parsed: VersionInfo;
+    try {
+      parsed = parseVersion(current.versionName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid current version.";
+      if (json) emitJson({ success: false, error: message });
+      else console.error(chalk.red(message));
+      return { exitCode: 1 };
+    }
     version = {
       versionName: `${parsed.versionName}`,
       versionCode: current.versionCode + 1,
     };
   }
 
-  console.log(chalk.cyan(`\nBumping version to ${version.versionName} (code: ${version.versionCode})\n`));
+  if (!json) console.log(chalk.cyan(`\nBumping version to ${version.versionName} (code: ${version.versionCode})\n`));
 
   let updated = false;
 
@@ -106,26 +139,29 @@ export async function runBump(context: CommandContext): Promise<CommandResult> {
     const configPath = join(projectRoot, configFile);
     if (!existsSync(configPath)) continue;
     if (updateCapacitorConfig(configPath, version)) {
-      console.log(chalk.green(`  Updated ${configFile}`));
+      if (!json) console.log(chalk.green(`  Updated ${configFile}`));
       updated = true;
     }
   }
 
-  const buildGradlePath = join(projectRoot, "android", "app", "build.gradle");
-  if (updateBuildGradle(buildGradlePath, version)) {
-    console.log(chalk.green(`  Updated android/app/build.gradle`));
-    updated = true;
+  for (const gradleFile of ["build.gradle", "build.gradle.kts"]) {
+    const buildGradlePath = join(projectRoot, "android", "app", gradleFile);
+    if (existsSync(buildGradlePath) && updateBuildGradle(buildGradlePath, version)) {
+      if (!json) console.log(chalk.green(`  Updated android/app/${gradleFile}`));
+      updated = true;
+    }
   }
 
   if (!updated) {
-    console.error(chalk.red("No files were updated."));
+    if (json) emitJson({ success: false, error: "No version fields were found in capacitor.config.json or Android Gradle files." });
+    else console.error(chalk.red("No version fields were found in capacitor.config.json or Android Gradle files."));
     return { exitCode: 1 };
   }
 
-  if (context.json || context.flags.json) {
+  if (json) {
     emitJson({ version: version.versionName, versionCode: version.versionCode });
+  } else {
+    console.log(chalk.green("\nVersion bump complete."));
   }
-
-  console.log(chalk.green("\nVersion bump complete."));
   return { exitCode: 0 };
 }

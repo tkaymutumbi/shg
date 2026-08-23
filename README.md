@@ -45,7 +45,7 @@ The project also includes a [documentation website](web/) (React + Vite) with fu
 - **Device Management** — List ADB devices with model info
 - **Logcat Viewer** — Tail filtered Android logs with `shg logs`
 - **Asset Generation** — Generate icons and splash screens via capacitor-assets
-- **Version Bumping** — Bump `versionName`/`versionCode` across configs and Gradle
+- **Version Bumping** — Bump `versionName`/`versionCode` in JSON config and Android Gradle files
 - **Upgrade Helper** — Check and upgrade Capacitor packages
 - **Clean Builds** — Remove build artifacts with one command
 - **Config System** — Global + per-project config with CLI flag overrides
@@ -137,7 +137,7 @@ shg dev
 shg dev --wifi
 ```
 
-The device IP is auto-detected. If LAN IP detection fails, SHG now falls back safely instead of passing an invalid host. If no device is found, you'll be prompted to enter the IP manually.
+The device IP is auto-detected for USB-authorized devices. If no device is found, enter either a legacy IP address (port 5555 is assumed) or the full `IP:port` shown by Android's Wireless debugging screen. SHG can also run Android's six-digit `adb pair` flow, retries while adbd restarts, and verifies that the device reaches the ready state before reporting success.
 
 **Custom dev server:**
 
@@ -162,6 +162,8 @@ shg doctor
 shg doctor --fix
 shg doctor --json
 ```
+
+`--json` is non-interactive and cannot be combined with `--fix`.
 
 ### `shg deploy`
 
@@ -224,11 +226,15 @@ Build a standalone APK/AAB. Automatically syncs web assets to the Android projec
 | `--release` | Build release variant |
 | `--variant <name>` | Build variant (default `debug`) |
 | `--flavor <name>` | Build flavor |
+| `--aab` | Build an Android App Bundle instead of an APK |
+| `--both` | Build both APK and AAB artifacts |
 | `--no-sync` | Skip web build and cap sync before Gradle |
 
 ```bash
 shg build
 shg build --release
+shg build --release --aab
+shg build --release --both
 shg build --variant release --no-sync   # If you synced manually already
 ```
 
@@ -247,11 +253,15 @@ List connected Android devices from ADB.
 | Flag | Description |
 |------|-------------|
 | `--json` | JSON output |
+| `--wifi` | Connect or pair over WiFi before listing devices |
 
 ```bash
 shg devices
 shg devices --json
+shg devices --wifi
 ```
+
+WiFi setup is interactive, so `--wifi` cannot be combined with `--json`.
 
 ### `shg logs`
 
@@ -299,7 +309,7 @@ shg open
 
 ### `shg bump`
 
-Bump `versionName` and `versionCode` in `capacitor.config.*` and `android/app/build.gradle`.
+Bump `versionName` and `versionCode` in `capacitor.config.json` and Android Groovy/Kotlin Gradle files. JavaScript/TypeScript configs are read but not rewritten, avoiding unsafe source-code mutation.
 
 | Flag | Description |
 |------|-------------|

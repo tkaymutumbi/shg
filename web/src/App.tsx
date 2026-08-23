@@ -20,7 +20,7 @@ const ThemeSwitcher = () => {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-  }, []);
+  }, [theme]);
 
   const handleToggle = () => {
     const next = toggleTheme();

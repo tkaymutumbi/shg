@@ -35,7 +35,7 @@ const CodeBlock = ({ content, language, onCopy }: CodeBlockProps) => {
   );
 };
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Search, 
   Terminal, 
@@ -62,7 +62,38 @@ const CATEGORIES = [
   { id: 'tests', label: 'Tests', icon: TestTube },
 ];
 
-const NAVIGATION: Record<string, any[]> = {
+interface NavigationItem {
+  id: string;
+  label: string;
+}
+
+interface NavigationGroup {
+  title: string;
+  items: NavigationItem[];
+}
+
+interface DocListItem {
+  title: string;
+  description: string;
+}
+
+interface DocSection {
+  id: string;
+  title?: string;
+  type: 'text' | 'code' | 'list';
+  content?: string;
+  language?: string;
+  items?: DocListItem[];
+}
+
+interface DocPage {
+  badge: string;
+  title: string;
+  description: string;
+  sections: DocSection[];
+}
+
+const NAVIGATION: Record<string, NavigationGroup[]> = {
   cli: [
     {
       title: 'Get Started',
@@ -129,7 +160,7 @@ const NAVIGATION: Record<string, any[]> = {
   ]
 };
 
-const DOC_CONTENT: Record<string, any> = {
+const DOC_CONTENT: Record<string, DocPage> = {
   welcome: {
     badge: 'CLI',
     title: 'Welcome to SHG',
@@ -338,6 +369,8 @@ const Docs = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toast, setToast] = useState({ isVisible: false, message: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const contentRef = useRef<HTMLElement>(null);
+  const scrollContentToTop = () => contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return null;
@@ -420,7 +453,7 @@ const Docs = () => {
                   setActiveCategory(cat.id);
                   const firstSection = NAVIGATION[cat.id][0].items[0].id;
                   setActiveSection(firstSection);
-                  window.scrollTo(0, 0);
+                  scrollContentToTop();
                 }}
               />
             ))}
@@ -467,19 +500,19 @@ const Docs = () => {
           ${isMobileMenuOpen ? 'block' : 'hidden'}
         `}>
           <div className="p-6 space-y-8 text-left">
-            {navigation.map((group: any) => (
+            {navigation.map((group) => (
               <div key={group.title}>
                 <h4 className="text-xs font-bold opacity-40 uppercase tracking-wider mb-4 flex items-center gap-2">
                   <ChevronRight size={12}/> {group.title}
                 </h4>
                 <div className="space-y-1">
-                  {group.items.map((item: any) => (
+                  {group.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => {
                         setActiveSection(item.id);
                         setIsMobileMenuOpen(false);
-                        window.scrollTo(0, 0);
+                        scrollContentToTop();
                       }}
                       className={`
                         w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors
@@ -498,7 +531,7 @@ const Docs = () => {
         </aside>
 
         {/* Central Content */}
-        <main className="flex-1 min-w-0 p-8 lg:p-12 overflow-y-auto h-[calc(100vh-3.5rem)] scroll-smooth text-left">
+        <main ref={contentRef} className="flex-1 min-w-0 p-8 lg:p-12 overflow-y-auto h-[calc(100vh-3.5rem)] scroll-smooth text-left">
           <div className="max-w-3xl">
             {searchResults !== null ? (
               <>
@@ -519,7 +552,7 @@ const Docs = () => {
                         onClick={() => {
                           setSearchQuery('');
                           setActiveSection(result.id);
-                          window.scrollTo(0, 0);
+                          scrollContentToTop();
                         }}
                         className="w-full text-left bg-dark-bg/30 border border-border-subtle p-4 rounded-xl hover:border-brand-accent/40 transition-all group"
                       >
@@ -542,24 +575,24 @@ const Docs = () => {
                 </header>
 
                 <div className="space-y-12">
-                  {content.sections.map((section: any) => (
+                  {content.sections.map((section) => (
                     <section key={section.id} id={section.id}>
                       {section.title && <h2 className="text-3xl font-bold mb-6 tracking-tight">{section.title}</h2>}
 
                       {section.type === 'text' && (
                         <p className="opacity-70 leading-7 mb-6 text-lg whitespace-pre-line">
-                          {renderTextWithCode(section.content)}
+                          {renderTextWithCode(section.content ?? '')}
                         </p>
                       )}
 
                       {section.type === 'code' && (
-                        <CodeBlock content={section.content} language={section.language} onCopy={showToast} />
+                        <CodeBlock content={section.content ?? ''} language={section.language} onCopy={showToast} />
                       )}
 
 
                       {section.type === 'list' && (
                         <div className="grid grid-cols-1 gap-4 mb-6">
-                          {section.items.map((item: any, idx: number) => (
+                          {section.items?.map((item, idx) => (
                             <div key={idx} className="bg-dark-bg/30 border border-border-subtle p-4 rounded-xl flex gap-4">
                               <div className="text-brand-accent font-bold opacity-40">{idx + 1}.</div>
                               <div>
@@ -596,7 +629,7 @@ const Docs = () => {
             <MenuIcon size={14}/> On this page
           </h4>
           <nav className="space-y-4">
-            {content.sections.map((section: any) => (
+            {content.sections.map((section) => (
               <button 
                 key={section.id}
                 onClick={() => {

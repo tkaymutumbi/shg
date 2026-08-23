@@ -5,6 +5,7 @@ import { homedir, networkInterfaces } from "node:os";
 import { runCommand } from "./executor.js";
 import { readJsonFile, writeJsonFile } from "./fsjson.js";
 import chalk from "chalk";
+import type { ExecResult } from "./executor.js";
 
 export interface AndroidDevice {
   id: string;
@@ -58,6 +59,46 @@ function getShgBinDir(): string {
   return join(homedir(), ".shg", "bin");
 }
 
+export function adbConnectSucceeded(result: Pick<ExecResult, "success" | "stdout" | "stderr">): boolean {
+  if (!result.success) return false;
+  const output = `${result.stdout}\n${result.stderr}`;
+  return /(?:already )?connected to\b/i.test(output)
+    && !/(?:failed|unable|refused|cannot connect)/i.test(output);
+}
+
+export function normalizeAdbEndpoint(value: string, defaultPort = 5555): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed)) return undefined;
+  const match = trimmed.match(/^([a-zA-Z0-9.-]+)(?::(\d{1,5}))?$/);
+  if (!match) return undefined;
+  const port = Number.parseInt(match[2] ?? String(defaultPort), 10);
+  if (port < 1 || port > 65535) return undefined;
+  return `${match[1]}:${port}`;
+}
+
+async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Promise<boolean> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const devices = await listAndroidDevices();
+    const port = endpoint.slice(endpoint.lastIndexOf(":"));
+    if (devices.some((device) => device.status === "device" && (device.id === endpoint || device.id.endsWith(port)))) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return false;
+}
+
+async function connectEndpoint(endpoint: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const result = await runCommand(
+      { label: "adb connect", cmd: "adb", args: ["connect", endpoint] },
+      { stdio: "pipe" },
+    );
+    if (adbConnectSucceeded(result) && await waitForConnectedEndpoint(endpoint)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+  return false;
+}
+
 export async function ensureAdb(): Promise<boolean> {
   const check = await runCommand(
     { label: "adb version", cmd: "adb", args: ["version"] },
@@ -69,7 +110,7 @@ export async function ensureAdb(): Promise<boolean> {
   console.log(chalk.yellow("\nadb not found on PATH."));
 
   const shgBin = getShgBinDir();
-  const adbPath = join(shgBin, "adb");
+  const adbPath = join(shgBin, process.platform === "win32" ? "adb.exe" : "adb");
 
   if (existsSync(adbPath)) {
     const binDir = join(homedir(), ".bun", "bin");
@@ -118,16 +159,26 @@ export async function ensureAdb(): Promise<boolean> {
   const extractDir = join(tmpDir, "platform-tools");
 
   if (process.platform === "win32") {
-    await runCommand(
+    const extractResult = await runCommand(
       { label: "unzip platform-tools", cmd: "powershell", args: ["Expand-Archive", "-Path", zipPath, "-DestinationPath", tmpDir, "-Force"] },
       { stdio: "pipe" },
     );
+    if (!extractResult.success) {
+      s.stop("Extraction failed.");
+      return false;
+    }
   } else {
-    await runCommand(
+    const extractResult = await runCommand(
       { label: "unzip platform-tools", cmd: "unzip", args: ["-o", zipPath, "-d", tmpDir] },
       { stdio: "pipe" },
     );
+    if (!extractResult.success) {
+      s.stop("Extraction failed. Ensure `unzip` is installed.");
+      return false;
+    }
   }
+
+  try { unlinkSync(zipPath); } catch {}
 
   mkdirSync(shgBin, { recursive: true });
 
@@ -138,7 +189,7 @@ export async function ensureAdb(): Promise<boolean> {
     const dest = join(shgBin, bin + ext);
     try {
       copyFileSync(src, dest);
-      chmodSync(dest, 0o755);
+      if (process.platform !== "win32") chmodSync(dest, 0o755);
 
       const bunBin = join(homedir(), ".bun", "bin");
       if (existsSync(bunBin)) {
@@ -171,17 +222,18 @@ export async function ensureAdb(): Promise<boolean> {
 }
 
 export async function getDeviceIp(deviceId?: string): Promise<string | undefined> {
-  const id = deviceId ?? "-s";
-  const args = deviceId ? ["-s", deviceId, "shell", "ip", "addr", "show", "wlan0"] : ["shell", "ip", "addr", "show", "wlan0"];
+  const prefix = deviceId ? ["-s", deviceId] : [];
+  const args = [...prefix, "shell", "ip", "-o", "-4", "addr", "show", "scope", "global"];
 
   const result = await runCommand(
     { label: "adb get device ip", cmd: "adb", args },
     { stdio: "pipe" },
   );
 
-  if (!result.success) {
+  const directMatch = result.stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
+  if (!result.success || !directMatch) {
     const ifconfigResult = await runCommand(
-      { label: "adb get device ip (fallback)", cmd: "adb", args: deviceId ? ["-s", deviceId, "shell", "ifconfig", "wlan0"] : ["shell", "ifconfig", "wlan0"] },
+      { label: "adb get device ip (fallback)", cmd: "adb", args: [...prefix, "shell", "ifconfig"] },
       { stdio: "pipe" },
     );
     if (!ifconfigResult.success) return undefined;
@@ -190,8 +242,7 @@ export async function getDeviceIp(deviceId?: string): Promise<string | undefined
     return ipMatch?.[1] ?? undefined;
   }
 
-  const ipMatch = result.stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
-  return ipMatch?.[1] ?? undefined;
+  return directMatch[1];
 }
 
 function getWifiStatePath(): string {
@@ -211,8 +262,8 @@ export async function connectOverWifi(): Promise<boolean> {
   console.log(chalk.cyan("\nSetting up WiFi debugging...\n"));
 
   const devices = await listAndroidDevices();
-  const usbDevices = devices.filter((d) => d.status === "device");
-  const wirelessDevices = devices.filter((d) => d.id.includes(":"));
+  const usbDevices = devices.filter((d) => d.status === "device" && !d.id.includes(":"));
+  const wirelessDevices = devices.filter((d) => d.status === "device" && d.id.includes(":"));
 
   if (wirelessDevices.length > 0) {
     console.log(chalk.green(`  Already connected wirelessly: ${wirelessDevices[0].id}`));
@@ -221,18 +272,15 @@ export async function connectOverWifi(): Promise<boolean> {
 
   if (usbDevices.length === 0) {
     const savedIp = loadWifiIp();
+    const savedEndpoint = savedIp ? normalizeAdbEndpoint(savedIp) : undefined;
 
-    if (savedIp) {
-      console.log(chalk.dim(`  Trying saved device IP: ${savedIp}`));
-      const retryResult = await runCommand(
-        { label: "adb connect", cmd: "adb", args: ["connect", `${savedIp}:5555`] },
-        { stdio: "pipe" },
-      );
-      if (retryResult.success) {
-        console.log(chalk.green(`  Reconnected to ${savedIp}:5555 over WiFi\n`));
+    if (savedEndpoint) {
+      console.log(chalk.dim(`  Trying saved device: ${savedEndpoint}`));
+      if (await connectEndpoint(savedEndpoint)) {
+        console.log(chalk.green(`  Reconnected to ${savedEndpoint} over WiFi\n`));
         return true;
       }
-      console.log(chalk.yellow(`  Could not reconnect to ${savedIp}:5555`));
+      console.log(chalk.yellow(`  Could not reconnect to ${savedEndpoint}`));
     }
 
     if (!savedIp) {
@@ -241,9 +289,9 @@ export async function connectOverWifi(): Promise<boolean> {
     }
 
     const ip = await p.text({
-      message: "Enter device IP address (shown in Settings → About phone → Status):",
-      placeholder: savedIp ?? "192.168.1.22",
-      validate: (val?: string) => (val?.trim() ? undefined : "IP is required"),
+      message: "Enter device address (IP or IP:port from Wireless debugging):",
+      placeholder: savedEndpoint ?? "192.168.1.22:5555",
+      validate: (val?: string) => normalizeAdbEndpoint(val ?? "") ? undefined : "Enter a valid host or host:port",
     }) as string | symbol;
 
     if (typeof ip !== "string") {
@@ -251,14 +299,53 @@ export async function connectOverWifi(): Promise<boolean> {
       return false;
     }
 
-    const connectResult = await runCommand(
-      { label: "adb connect", cmd: "adb", args: ["connect", `${ip.trim()}:5555`] },
+    const endpoint = normalizeAdbEndpoint(ip);
+    if (!endpoint) return false;
+
+    if (await connectEndpoint(endpoint)) {
+      saveWifiIp(endpoint);
+      console.log(chalk.green(`  Connected to ${endpoint} over WiFi\n`));
+      return true;
+    }
+
+    const shouldPair = await p.confirm({
+      message: "Connection failed. Pair with Android Wireless debugging first?",
+      initialValue: false,
+    });
+    if (typeof shouldPair !== "boolean" || !shouldPair) {
+      console.error(chalk.red(`  Could not connect to ${endpoint}.`));
+      return false;
+    }
+
+    const pairAddress = await p.text({
+      message: "Pairing address shown under 'Pair device with pairing code' (IP:port):",
+      placeholder: "192.168.1.22:37123",
+      validate: (val?: string) => normalizeAdbEndpoint(val ?? "", 0) ? undefined : "Enter a valid host:port",
+    });
+    if (typeof pairAddress !== "string") return false;
+    const pairingEndpoint = normalizeAdbEndpoint(pairAddress, 0);
+    if (!pairingEndpoint || !pairAddress.includes(":")) return false;
+
+    const pairingCode = await p.text({
+      message: "Six-digit pairing code:",
+      validate: (val?: string) => /^\d{6}$/.test(val?.trim() ?? "") ? undefined : "Enter the six-digit pairing code",
+    });
+    if (typeof pairingCode !== "string") return false;
+
+    const pairResult = await runCommand(
+      { label: "adb pair", cmd: "adb", args: ["pair", pairingEndpoint, pairingCode.trim()] },
       { stdio: "pipe" },
     );
+    const pairOutput = `${pairResult.stdout}\n${pairResult.stderr}`;
+    if (!pairResult.success || !/successfully paired/i.test(pairOutput)) {
+      console.error(chalk.red("  Wireless debugging pairing failed."));
+      return false;
+    }
 
-    if (connectResult.success) {
-      saveWifiIp(ip.trim());
-      console.log(chalk.green(`  Connected to ${ip.trim()}:5555 over WiFi\n`));
+    console.log(chalk.green("  Device paired. Connecting to the Wireless debugging address..."));
+    if (await connectEndpoint(endpoint)) {
+      saveWifiIp(endpoint);
+      console.log(chalk.green(`  Connected to ${endpoint} over WiFi\n`));
       return true;
     }
 
@@ -266,7 +353,7 @@ export async function connectOverWifi(): Promise<boolean> {
     console.log(chalk.yellow("  1. Device has Developer Options enabled"));
     console.log(chalk.yellow("  2. USB Debugging is enabled"));
     console.log(chalk.yellow("  3. Device has been authorized (USB connect once if first time)"));
-    console.log(chalk.yellow(`  4. Device IP is correct (${ip.trim()})`));
+    console.log(chalk.yellow(`  4. Wireless debugging address is correct (${endpoint})`));
     return false;
   }
 
@@ -294,24 +381,24 @@ export async function connectOverWifi(): Promise<boolean> {
 
   console.log(chalk.dim("  Restarted adbd in TCP mode on port 5555"));
 
-  const connectResult = await runCommand(
-    { label: "adb connect", cmd: "adb", args: ["connect", `${ip}:5555`] },
-    { stdio: "pipe" },
-  );
-
-  if (!connectResult.success) {
+  const endpoint = `${ip}:5555`;
+  if (!await connectEndpoint(endpoint)) {
     console.error(chalk.red(`  Failed to connect to ${ip}:5555`));
     return false;
   }
 
-  saveWifiIp(ip);
+  saveWifiIp(endpoint);
   console.log(chalk.green(`  Connected to ${ip}:5555 over WiFi\n`));
   return true;
 }
 
 export function getLanIp(): string {
   const interfaces = networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
+  const names = Object.keys(interfaces).sort((a, b) => {
+    const score = (name: string) => /^(wl|wifi|en|eth)/i.test(name) ? 0 : /^(docker|veth|br-|vir|tun|tap|tailscale)/i.test(name) ? 2 : 1;
+    return score(a) - score(b);
+  });
+  for (const name of names) {
     for (const iface of interfaces[name] ?? []) {
       if (iface.family === "IPv4" && !iface.internal) {
         return iface.address;

@@ -5,6 +5,7 @@ import { runBuild } from "./commands/build.js";
 import { runClean } from "./commands/clean.js";
 import { runDeploy } from "./commands/deploy.js";
 import { runDev } from "./commands/dev.js";
+import { runDevices } from "./commands/devices.js";
 import { runLogs } from "./commands/logs.js";
 import { runOpen } from "./commands/open.js";
 import { runPlugin } from "./commands/plugin.js";
@@ -23,6 +24,7 @@ export function isCancelled<T>(val: T | symbol): val is symbol {
 
 const CATEGORIES = [
   { value: "dev", label: "Dev Server (Live Reload)", hint: "start dev server + android app" },
+  { value: "devices", label: "Connect / List Devices", hint: "USB and WiFi ADB setup" },
   { value: "deploy", label: "Build & Deploy", hint: "smart deploy pipeline" },
   { value: "setup", label: "Capacitor Setup", hint: "install/init/update/add android" },
   { value: "build", label: "Build APK/AAB", hint: "standalone debug or release build" },
@@ -85,6 +87,18 @@ export async function runInteractive(context: CommandContext): Promise<number> {
 
     const result = await runDev({ ...context, flags });
     p.outro(result.exitCode === 0 ? chalk.cyan("SHG done.") : chalk.red("SHG ended with errors."));
+    return result.exitCode;
+  }
+
+  if (category === "devices") {
+    const wifi = await p.confirm({
+      message: "Connect or pair a device over WiFi?",
+      initialValue: false,
+    });
+    if (isCancelled(wifi)) return 130;
+    const flags: Record<string, string | boolean> = wifi ? { wifi: true } : {};
+    const result = await runDevices({ ...context, flags });
+    p.outro(result.exitCode === 0 ? chalk.cyan("Device check complete.") : chalk.red("Device connection failed."));
     return result.exitCode;
   }
 

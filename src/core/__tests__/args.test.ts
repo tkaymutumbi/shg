@@ -72,6 +72,14 @@ describe("parseArgs", () => {
     expect(result.errors).toContain("Unknown short flag: -x");
   });
 
+  test("unknown long flag produces error", () => {
+    expect(parseArgs(["build", "--relese"]).errors).toContain("Unknown flag: --relese");
+  });
+
+  test("boolean flags reject inline values", () => {
+    expect(parseArgs(["build", "--release=false"]).errors).toContain("Flag --release does not take a value");
+  });
+
   test("--all flag with value flags", () => {
     const result = parseArgs(["deploy", "--all", "--variant", "release"]);
     expect(result.flags.all).toBe(true);

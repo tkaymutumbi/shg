@@ -2,6 +2,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import Logo from './Logo';
 
+declare const __SHG_VERSION__: string;
+
 const Terminal: React.FC = () => {
   return (
     <div className="w-full max-w-2xl mx-auto bg-[#2b120d] rounded-lg shadow-2xl overflow-hidden border border-[#3e1e18] font-mono text-sm text-[#d6d3d1] text-left">
@@ -37,7 +39,7 @@ const Terminal: React.FC = () => {
         >
           <Logo className="text-7xl mb-4" />
           <div className="text-[#a8a29e] text-base mb-6">
-            Capacitor Android CLI - by SHG (v2026.4.1)
+            Capacitor Android CLI - by SHG (v{__SHG_VERSION__})
           </div>
         </motion.div>
 

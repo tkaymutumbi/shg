@@ -1,6 +1,6 @@
 import { describe, expect, test, mock } from "bun:test";
 import { selectedDeploySteps } from "../deploy.js";
-import { capitalize } from "../build.js";
+import { capitalize, getGradleBuildTasks } from "../build.js";
 import { getFilter } from "../logs.js";
 import { getStringFlag } from "../run.js";
 import { getCleanTargets } from "../clean.js";
@@ -35,6 +35,13 @@ describe("capitalize", () => {
   test("already capitalized", () => expect(capitalize("Debug")).toBe("Debug"));
 });
 
+describe("getGradleBuildTasks", () => {
+  test("builds flavored APK and AAB tasks", () => {
+    expect(getGradleBuildTasks("release", "demo", ["apk", "aab"]))
+      .toEqual(["assembleDemoRelease", "bundleDemoRelease"]);
+  });
+});
+
 describe("getFilter", () => {
   test("default filter", () => expect(getFilter()).toBe("Capacitor:D"));
   test("custom tag default level", () => expect(getFilter("MyTag")).toBe("MyTag:D"));
@@ -52,8 +59,8 @@ describe("getCleanTargets", () => {
   const targets = getCleanTargets("/project");
   test("returns 5 targets", () => expect(targets).toHaveLength(5));
   test("includes android build", () => expect(targets[0].path).toContain("android/build"));
-  test("includes dist", () => expect(targets[3].path).toContain("dist"));
-  test("includes www", () => expect(targets[4].label).toBe("Capacitor web assets"));
+  test("includes app build", () => expect(targets.some((target) => target.path.includes("android/app/build"))).toBe(true));
+  test("uses configured/default web assets only", () => expect(targets[4].label).toBe("Capacitor web assets (dist)"));
 });
 
 describe("formatAppName", () => {
@@ -69,6 +76,7 @@ describe("sanitizePackageName", () => {
   test("strips special chars", () => expect(sanitizePackageName("hello-world!@#")).toBe("helloworld"));
   test("falls back to app", () => expect(sanitizePackageName("!!!")).toBe("app"));
   test("preserves alphanumeric", () => expect(sanitizePackageName("app123")).toBe("app123"));
+  test("prefixes names that begin with a digit", () => expect(sanitizePackageName("123app")).toBe("app123app"));
 });
 
 describe("parseValue", () => {
@@ -111,6 +119,10 @@ describe("setDeepValue", () => {
     setDeepValue(obj, "output.verbose", true);
     expect((obj.output as Record<string, unknown>).json).toBe(false);
     expect((obj.output as Record<string, unknown>).verbose).toBe(true);
+  });
+
+  test("rejects prototype-polluting paths", () => {
+    expect(() => setDeepValue({}, "__proto__.polluted", true)).toThrow();
   });
 });
 

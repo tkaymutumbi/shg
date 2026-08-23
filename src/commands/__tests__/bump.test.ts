@@ -34,4 +34,10 @@ describe("parseVersion", () => {
     expect(v.versionName).toBe("2026.4.0");
     expect(v.versionCode).toBe(20260400);
   });
+
+  test("rejects malformed and ambiguous versions", () => {
+    expect(() => parseVersion("nope")).toThrow();
+    expect(() => parseVersion("1.2foo.3")).toThrow();
+    expect(() => parseVersion("1.100.0")).toThrow();
+  });
 });

@@ -9,16 +9,23 @@ export async function runUpgrade(context: CommandContext): Promise<CommandResult
 
   console.log(chalk.cyan("\nChecking Capacitor package versions...\n"));
 
-  const lsResult = await runCommand(
-    { label: "bun pm ls", cmd: "bun", args: ["pm", "ls"], cwd: projectRoot },
+  const outdatedResult = await runCommand(
+    { label: "bun outdated", cmd: "bun", args: ["outdated"], cwd: projectRoot },
     { stdio: "pipe" },
   );
 
-  if (lsResult.success && lsResult.stdout.trim()) {
-    console.log(lsResult.stdout);
-    console.log(chalk.dim("\nTo check for newer versions, visit https://www.npmjs.com/search?q=%40capacitor"));
+  if (!outdatedResult.success) {
+    console.error(chalk.red(outdatedResult.stderr || outdatedResult.errorMessage || "Could not check package updates."));
+    return { exitCode: 1 };
+  }
+
+  const capacitorLines = outdatedResult.stdout
+    .split(/\r?\n/)
+    .filter((line) => line.includes("@capacitor/"));
+  if (capacitorLines.length > 0) {
+    console.log(capacitorLines.join("\n"));
   } else {
-    console.log(chalk.green("All @capacitor packages are up to date."));
+    console.log(chalk.green("All declared @capacitor packages are up to date."));
   }
 
   if (context.flags.run) {
