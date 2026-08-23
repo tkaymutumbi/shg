@@ -5,7 +5,7 @@ import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { requireProjectRoot, hasAndroidPlatform, readWebDir, hasValidAndroidSdk, findAndroidSdkRoot, hasConnectedDevice, getCapacitorDependencyMajorMismatch } from "../core/project.js";
-import { ensureAdb, connectOverWifi, getLanIp } from "../core/android.js";
+import { ensureAdb, connectOverWifi, getLanIp, reconnectSavedWirelessDevice } from "../core/android.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 const COMMON_DEV_PORTS = [5173, 4173, 5174, 4174, 3000, 8080];
@@ -151,7 +151,8 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   let usingWifi = wifi;
 
   if (usingWifi) {
-    const wifiOk = await connectOverWifi();
+    const remembered = await reconnectSavedWirelessDevice();
+    const wifiOk = Boolean(remembered) || await connectOverWifi();
     if (!wifiOk) return { exitCode: 1 };
   }
 

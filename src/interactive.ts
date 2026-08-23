@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { runAssets } from "./commands/assets.js";
 import { runBuild } from "./commands/build.js";
 import { runClean } from "./commands/clean.js";
+import { runConnect } from "./commands/connect.js";
 import { runDeploy } from "./commands/deploy.js";
 import { runDev } from "./commands/dev.js";
 import { runDevices } from "./commands/devices.js";
@@ -12,6 +13,7 @@ import { runPlugin } from "./commands/plugin.js";
 import { runSetup } from "./commands/setup.js";
 import { runCreate } from "./commands/create.js";
 import { runUpgrade } from "./commands/upgrade.js";
+import { runInstall } from "./commands/install.js";
 import type { CommandContext } from "./commands/types.js";
 
 export function isCancelled<T>(val: T | symbol): val is symbol {
@@ -25,6 +27,8 @@ export function isCancelled<T>(val: T | symbol): val is symbol {
 const CATEGORIES = [
   { value: "dev", label: "Dev Server (Live Reload)", hint: "start dev server + android app" },
   { value: "devices", label: "Connect / List Devices", hint: "USB and WiFi ADB setup" },
+  { value: "connect", label: "Pair Device with QR", hint: "Android 11+ Wireless debugging" },
+  { value: "install", label: "Install APK", hint: "build, install, and launch" },
   { value: "deploy", label: "Build & Deploy", hint: "smart deploy pipeline" },
   { value: "setup", label: "Capacitor Setup", hint: "install/init/update/add android" },
   { value: "build", label: "Build APK/AAB", hint: "standalone debug or release build" },
@@ -99,6 +103,28 @@ export async function runInteractive(context: CommandContext): Promise<number> {
     const flags: Record<string, string | boolean> = wifi ? { wifi: true } : {};
     const result = await runDevices({ ...context, flags });
     p.outro(result.exitCode === 0 ? chalk.cyan("Device check complete.") : chalk.red("Device connection failed."));
+    return result.exitCode;
+  }
+
+  if (category === "connect") {
+    const result = await runConnect(context);
+    p.outro(result.exitCode === 0 ? chalk.cyan("Device connected.") : chalk.red("Device connection failed."));
+    return result.exitCode;
+  }
+
+  if (category === "install") {
+    const variant = await p.select({
+      message: "Pick APK variant:",
+      options: [
+        { value: "debug", label: "Debug APK", hint: "development signing" },
+        { value: "release", label: "Release APK", hint: "installable release build" },
+      ],
+    });
+    if (isCancelled(variant)) return 130;
+    const flags: Record<string, string | boolean> = { variant: variant as string };
+    if (variant === "release") flags.release = true;
+    const result = await runInstall({ ...context, flags });
+    p.outro(result.exitCode === 0 ? chalk.cyan("APK installed.") : chalk.red("APK installation failed."));
     return result.exitCode;
   }
 

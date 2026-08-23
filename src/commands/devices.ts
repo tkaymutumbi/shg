@@ -1,6 +1,7 @@
 import chalk from "chalk";
-import { connectOverWifi, ensureAdb, listAndroidDevices } from "../core/android.js";
+import { ensureAdb, listAndroidDevices } from "../core/android.js";
 import { emitJson } from "../core/project.js";
+import { runConnect } from "./connect.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 export async function runDevices(context: CommandContext): Promise<CommandResult> {
@@ -9,7 +10,9 @@ export async function runDevices(context: CommandContext): Promise<CommandResult
     return { exitCode: 2 };
   }
   if (context.flags.wifi) {
-    if (!await ensureAdb() || !await connectOverWifi()) return { exitCode: 1 };
+    if (!await ensureAdb()) return { exitCode: 1 };
+    const connection = await runConnect({ ...context, flags: { ...context.flags, wifi: false } });
+    if (connection.exitCode !== 0) return connection;
   }
   const devices = await listAndroidDevices();
 

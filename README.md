@@ -35,6 +35,8 @@ The project also includes a [documentation website](web/) (React + Vite) with fu
 - **Interactive TUI** — Launch `shg` with no arguments to get a menu-driven interface
 - **Live Reload** — Start a dev server and Android app together with `shg dev`
 - **WiFi Debugging** — Run `shg dev --wifi` to deploy and hot-reload wirelessly
+- **QR Wireless Pairing** — Run `shg connect` to pair Android 11+ through a terminal QR code and mDNS
+- **APK Installation** — Run `shg install` or `shg install --release` to build, install, and launch the selected APK
 - **Interactive Dev Prompting** — Pick Auto, WiFi, or USB/Emulator from the interactive dev flow
 - **Auto-Install adb** — Downloads platform-tools automatically if adb is missing
 - **Smart Deploy** — Build → sync → run in one command with failure safety
@@ -71,11 +73,11 @@ bun link
 - [Node.js](https://nodejs.org) 18+ (required to run the compiled CLI; Bun is still needed for the wrapped project commands)
 - [Java JDK](https://adoptium.net) 17+ (for Android builds)
 - [Android SDK](https://developer.android.com/studio) with `ANDROID_HOME` or `ANDROID_SDK_ROOT` set
-- `adb` available on PATH
+- Current Android SDK Platform-Tools (`adb`) available on PATH; SHG can download a private copy when needed
 
 ### Windows
 
-SHG uses the Android Gradle wrapper (`android\gradlew.bat`) and PowerShell for its Windows platform-tools extraction path. Install Bun, Java 17+, and Android Studio with the Android SDK and platform-tools components. SHG can download a private copy of `adb.exe` when it is missing; the bundled tool is added to the current SHG process automatically. Add `%USERPROFILE%\.shg\bin` to your user `PATH` if you want that copy available in future terminals.
+SHG uses the Android Gradle wrapper (`android\gradlew.bat`) and PowerShell for its Windows platform-tools extraction path. Install Bun, Java 17+, and Android Studio with the Android SDK and platform-tools components. SHG can download a private copy of `adb.exe` when it is missing; the bundled tool is added to the current SHG process automatically. Add `%USERPROFILE%\.shg\bin` to your user `PATH` if you want that copy available in future terminals. For QR pairing, allow `adb.exe` through Windows Defender Firewall and use Windows Terminal or another terminal that preserves Unicode/ANSI output.
 
 ## Quick Start
 
@@ -86,6 +88,10 @@ shg
 # Or jump straight to a command
 shg doctor --fix
 shg setup --install --add-android
+shg connect                         # first-time QR pairing
+shg dev                             # live reload after pairing
+shg run                             # debug build/deploy flow
+shg install --release               # build/install/launch release APK
 shg dev --host 0.0.0.0              # Live reload over USB
 shg dev --wifi                       # Live reload over WiFi
 shg deploy --all --device emulator-5554
@@ -101,6 +107,8 @@ Running `shg` with no arguments opens the interactive TUI:
 ├─────────────────────────────────────────────┤
 │  What do you want to do?                    │
 │                                             │
+│  ○ Pair Device with QR                       │
+│  ○ Install APK                               │
 │  ○ Dev Server (Live Reload)                 │
 │  ○ Build & Deploy                           │
 │  ○ Capacitor Setup                          │
@@ -117,6 +125,54 @@ Running `shg` with no arguments opens the interactive TUI:
 Each selection walks you through the necessary prompts — no flags to remember. The Dev flow now lets you choose Auto, WiFi, or USB/Emulator mode and set the port/host interactively.
 
 ## Command Reference
+
+### `shg connect`
+
+Pair Android Wireless debugging without typing either port. This requires Android 11+, current platform-tools, Wireless debugging enabled on the phone, and the phone and computer on the same Wi-Fi network.
+
+First time:
+
+```text
+shg connect
+→ open Developer options → Wireless debugging on the phone
+→ choose Pair device with QR code
+→ scan the QR code shown in the SHG terminal
+→ SHG discovers the pairing service, runs adb pair, then connects automatically
+```
+
+After pairing, Android and ADB normally reconnect the workstation automatically. SHG also remembers only the reusable post-pairing endpoint, so the repeat workflow is simply:
+
+```bash
+shg dev                    # live reload
+shg run                    # Capacitor debug run
+shg install --release      # release APK install + launch
+```
+
+The QR contains a short-lived Android `WIFI:T:ADB;S:...;P:...;;` credential. Treat it like a temporary pairing password: do not share a screenshot, and generate a fresh QR with `shg connect` if pairing is rejected. SHG never stores the QR secret.
+
+If mDNS is unavailable, SHG explains the likely network causes and keeps the manual fallback: `shg devices --wifi` asks for the Wireless debugging IP/port and six-digit pairing code. Check VPN isolation, guest Wi-Fi multicast blocking, the Windows firewall, and whether the two devices are on the same network.
+
+### `shg install`
+
+Build, install, and launch an APK. The default is a debug APK; `--release` selects the release variant. A saved paired device is reused automatically.
+
+| Flag | Description |
+|------|-------------|
+| `--release` | Build/install the release APK |
+| `--variant <name>` | Select another Gradle variant |
+| `--flavor <name>` | Select a product flavor |
+| `--device <id>` | Target an exact ADB device |
+| `--no-build` | Install an existing matching APK only |
+| `--no-sync` | Skip web build and Capacitor sync during the build |
+
+```bash
+shg install
+shg install --release
+shg install --release --flavor free --device 192.168.1.25:37123
+shg install --no-build
+```
+
+`shg install` intentionally accepts APK output only. Use `shg build --release --aab` to produce an Android App Bundle for Play Store or bundle distribution; an AAB cannot be installed directly with ordinary `adb install`. Installation errors for a differently-signed existing app or a lower version code are reported with the appropriate remediation.
 
 ### `shg dev`
 
@@ -222,6 +278,8 @@ shg run --device emulator-5554 --variant debug
 
 The last successful device, variant, and flavor are saved to `.shg/state.json`.
 
+Use `shg run` for the normal debug/Capacitor deployment workflow. Use `shg dev` when you need live reload. Use `shg install --release` for an installable release APK; release builds are not a live-reload workflow.
+
 ### `shg build`
 
 Build a standalone APK/AAB. Automatically syncs web assets to the Android project before building (skip with `--no-sync`).
@@ -242,6 +300,8 @@ shg build --release --aab
 shg build --release --both
 shg build --variant release --no-sync   # If you synced manually already
 ```
+
+An APK is a directly installable phone artifact. An AAB is a distribution bundle for Play Store or bundle tooling, not a direct `adb install` input.
 
 ### `shg clean`
 

@@ -14,6 +14,37 @@ export interface AndroidDevice {
   model?: string;
 }
 
+export type AdbMdnsServiceType =
+  | "_adb._tcp"
+  | "_adb-tls-pairing._tcp"
+  | "_adb-tls-connect._tcp";
+
+export interface AdbMdnsService {
+  instanceName: string;
+  serviceType: AdbMdnsServiceType;
+  endpoint: string;
+}
+
+export interface AdbMdnsCheck {
+  available: boolean;
+  output: string;
+  message?: string;
+}
+
+export function parseAdbPlatformToolsVersion(output: string): [number, number, number] | undefined {
+  const match = output.match(/^\s*Version\s+(\d+)\.(\d+)\.(\d+)/im)
+    ?? output.match(/platform-tools[^\d]*(\d+)\.(\d+)\.(\d+)/i);
+  if (!match) return undefined;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+export function isQrPairingAdbVersion(output: string): boolean {
+  const version = parseAdbPlatformToolsVersion(output);
+  if (!version) return false;
+  const [major, minor, patch] = version;
+  return major > 30 || (major === 30 && (minor > 0 || (minor === 0 && patch >= 2)));
+}
+
 export function parseAdbDevices(output: string): AndroidDevice[] {
   return output
     .split(/\r?\n/)
@@ -39,6 +70,96 @@ export async function listAndroidDevices(): Promise<AndroidDevice[]> {
 
   if (!result.success) return [];
   return parseAdbDevices(result.stdout);
+}
+
+const MDNS_SERVICE_PATTERN = /^(?:_adb(?:-tls-(?:pairing|connect))?)\._tcp$/i;
+
+export function parseAdbMdnsServices(output: string): AdbMdnsService[] {
+  const services: AdbMdnsService[] = [];
+
+  for (const line of output.split(/\r?\n/)) {
+    const match = line.trim().match(/^(\S+)\s+(_adb(?:-tls-(?:pairing|connect))?\._tcp)\s+(\S+)\s*$/i);
+    if (!match || !MDNS_SERVICE_PATTERN.test(match[2])) continue;
+
+    const endpoint = normalizeAdbEndpoint(match[3], 0);
+    if (!endpoint) continue;
+
+    services.push({
+      instanceName: match[1],
+      serviceType: match[2].toLowerCase() as AdbMdnsServiceType,
+      endpoint,
+    });
+  }
+
+  return services;
+}
+
+export function findAdbMdnsService(
+  services: AdbMdnsService[],
+  serviceType: AdbMdnsServiceType,
+  instanceName: string,
+): AdbMdnsService | undefined {
+  return services.find((service) => (
+    service.serviceType === serviceType.toLowerCase() && service.instanceName === instanceName
+  ));
+}
+
+export function selectMdnsConnectService(
+  services: AdbMdnsService[],
+  pairingEndpoint?: string,
+): AdbMdnsService | undefined {
+  const connectServices = services.filter((service) => service.serviceType === "_adb-tls-connect._tcp");
+  if (connectServices.length === 0) return undefined;
+
+  if (pairingEndpoint) {
+    const pairingHost = getEndpointHost(pairingEndpoint);
+    const sameHost = connectServices.filter((service) => getEndpointHost(service.endpoint) === pairingHost);
+    if (sameHost.length === 1) return sameHost[0];
+  }
+
+  return connectServices.length === 1 ? connectServices[0] : undefined;
+}
+
+export async function listAdbMdnsServices(): Promise<AdbMdnsService[]> {
+  const result = await runCommand(
+    { label: "adb mdns services", cmd: "adb", args: ["mdns", "services"], timeout: 10_000 },
+    { stdio: "pipe" },
+  );
+  if (!result.success) return [];
+  return parseAdbMdnsServices(`${result.stdout}\n${result.stderr}`);
+}
+
+export async function checkAdbMdns(): Promise<AdbMdnsCheck> {
+  const result = await runCommand(
+    { label: "adb mdns check", cmd: "adb", args: ["mdns", "check"], timeout: 10_000 },
+    { stdio: "pipe" },
+  );
+  const output = `${result.stdout}\n${result.stderr}`.trim();
+  if (result.success && /mdns/i.test(output)) {
+    return { available: true, output };
+  }
+  return {
+    available: false,
+    output,
+    message: "ADB mDNS discovery is unavailable. Update platform-tools and check that multicast/mDNS is allowed on the current network.",
+  };
+}
+
+export async function waitForAdbMdnsService(
+  serviceType: AdbMdnsServiceType,
+  instanceName: string,
+  timeoutMs = 45_000,
+  pollIntervalMs = 750,
+  signal?: AbortSignal,
+): Promise<AdbMdnsService | undefined> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (signal?.aborted) return undefined;
+    const service = findAdbMdnsService(await listAdbMdnsServices(), serviceType, instanceName);
+    if (service) return service;
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  return undefined;
 }
 
 function getPlatformToolsUrl(): string {
@@ -104,37 +225,73 @@ export function adbConnectSucceeded(result: Pick<ExecResult, "success" | "stdout
 export function normalizeAdbEndpoint(value: string, defaultPort = 5555): string | undefined {
   const trimmed = value.trim();
   if (!trimmed || /\s/.test(trimmed)) return undefined;
-  const match = trimmed.match(/^([a-zA-Z0-9.-]+)(?::(\d{1,5}))?$/);
+  const match = trimmed.match(/^(\[[0-9a-f:]+\]|[a-zA-Z0-9.-]+)(?::(\d{1,5}))?$/i);
   if (!match) return undefined;
   const port = Number.parseInt(match[2] ?? String(defaultPort), 10);
   if (port < 1 || port > 65535) return undefined;
   return `${match[1]}:${port}`;
 }
 
+function getEndpointHost(endpoint: string): string {
+  const value = endpoint.trim().toLowerCase();
+  if (value.startsWith("[")) return value.slice(0, value.indexOf("]") + 1);
+  const separator = value.lastIndexOf(":");
+  return separator === -1 ? value : value.slice(0, separator);
+}
+
 export function isMatchingAdbEndpoint(deviceId: string, endpoint: string): boolean {
   return deviceId.trim().toLowerCase() === endpoint.trim().toLowerCase();
 }
 
-async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Promise<boolean> {
+export function isWirelessAdbId(deviceId: string): boolean {
+  return deviceId.includes(":") || /_adb-tls-(?:connect|pairing)\._tcp$/i.test(deviceId);
+}
+
+async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Promise<string | undefined> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const devices = await listAndroidDevices();
-    if (devices.some((device) => device.status === "device" && isMatchingAdbEndpoint(device.id, endpoint))) return true;
+    const exact = devices.find((device) => device.status === "device" && isMatchingAdbEndpoint(device.id, endpoint));
+    if (exact) return exact.id;
+
+    // Modern adb may expose a resolved mDNS alias instead of the IP:port that
+    // was passed to `adb connect`. If exactly one wireless device is ready,
+    // it is safe to return that alias; multiple devices remain ambiguous.
+    const wireless = devices.filter((device) => device.status === "device" && isWirelessAdbId(device.id));
+    if (wireless.length === 1) return wireless[0].id;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  return false;
+  return undefined;
 }
 
-async function connectEndpoint(endpoint: string): Promise<boolean> {
+export async function connectAdbEndpoint(endpoint: string): Promise<string | undefined> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const result = await runCommand(
       { label: "adb connect", cmd: "adb", args: ["connect", endpoint], timeout: 15_000 },
       { stdio: "pipe" },
     );
-    if (adbConnectSucceeded(result) && await waitForConnectedEndpoint(endpoint)) return true;
+    if (adbConnectSucceeded(result)) {
+      const connected = await waitForConnectedEndpoint(endpoint);
+      if (connected) return connected;
+    }
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
-  return false;
+  return undefined;
+}
+
+export function adbPairSucceeded(result: Pick<ExecResult, "success" | "stdout" | "stderr">): boolean {
+  const output = `${result.stdout}\n${result.stderr}`;
+  return result.success
+    && /paired/i.test(output)
+    && !/(?:failed|rejected|error|unable)/i.test(output);
+}
+
+export async function pairAdbEndpoint(endpoint: string, secret: string): Promise<boolean> {
+  const result = await runCommand(
+    { label: "adb pair", cmd: "adb", args: ["pair", endpoint, secret], timeout: 20_000 },
+    { stdio: "pipe" },
+  );
+  return adbPairSucceeded(result);
 }
 
 export async function ensureAdb(): Promise<boolean> {
@@ -302,8 +459,41 @@ export function loadWifiIp(): string | undefined {
   return state?.lastIp;
 }
 
-function saveWifiIp(ip: string): void {
+export function saveWifiIp(ip: string): void {
   writeJsonFile(getWifiStatePath(), { lastIp: ip });
+}
+
+/** Reconnect a remembered wireless device without prompting for a new credential. */
+export async function reconnectSavedWirelessDevice(preferredEndpoint?: string): Promise<string | undefined> {
+  const devices = await listAndroidDevices();
+  const requested = normalizeAdbEndpoint(preferredEndpoint ?? loadWifiIp() ?? "");
+  const readyWireless = devices.filter((device) => device.status === "device" && isWirelessAdbId(device.id));
+
+  if (requested) {
+    const current = readyWireless.find((device) => isMatchingAdbEndpoint(device.id, requested));
+    if (current) return current.id;
+
+    const reconnected = await connectAdbEndpoint(requested);
+    if (reconnected) {
+      saveWifiIp(requested);
+      return reconnected;
+    }
+  } else if (readyWireless.length === 1) {
+    const endpoint = normalizeAdbEndpoint(readyWireless[0].id, 0);
+    if (endpoint) saveWifiIp(endpoint);
+    return readyWireless[0].id;
+  }
+
+  const services = (await listAdbMdnsServices()).filter((service) => service.serviceType === "_adb-tls-connect._tcp");
+  const candidates = requested
+    ? services.filter((service) => getEndpointHost(service.endpoint) === getEndpointHost(requested))
+    : services.length === 1 ? services : [];
+  if (candidates.length !== 1) return undefined;
+
+  const connected = await connectAdbEndpoint(candidates[0].endpoint);
+  if (!connected) return undefined;
+  saveWifiIp(candidates[0].endpoint);
+  return connected;
 }
 
 export async function connectOverWifi(): Promise<boolean> {
@@ -324,7 +514,7 @@ export async function connectOverWifi(): Promise<boolean> {
 
     if (savedEndpoint) {
       console.log(chalk.dim(`  Trying saved device: ${savedEndpoint}`));
-      if (await connectEndpoint(savedEndpoint)) {
+      if (await connectAdbEndpoint(savedEndpoint)) {
         console.log(chalk.green(`  Reconnected to ${savedEndpoint} over WiFi\n`));
         return true;
       }
@@ -350,7 +540,7 @@ export async function connectOverWifi(): Promise<boolean> {
     const endpoint = normalizeAdbEndpoint(ip);
     if (!endpoint) return false;
 
-    if (await connectEndpoint(endpoint)) {
+    if (await connectAdbEndpoint(endpoint)) {
       saveWifiIp(endpoint);
       console.log(chalk.green(`  Connected to ${endpoint} over WiFi\n`));
       return true;
@@ -391,7 +581,7 @@ export async function connectOverWifi(): Promise<boolean> {
     }
 
     console.log(chalk.green("  Device paired. Connecting to the Wireless debugging address..."));
-    if (await connectEndpoint(endpoint)) {
+    if (await connectAdbEndpoint(endpoint)) {
       saveWifiIp(endpoint);
       console.log(chalk.green(`  Connected to ${endpoint} over WiFi\n`));
       return true;
@@ -430,7 +620,7 @@ export async function connectOverWifi(): Promise<boolean> {
   console.log(chalk.dim("  Restarted adbd in TCP mode on port 5555"));
 
   const endpoint = `${ip}:5555`;
-  if (!await connectEndpoint(endpoint)) {
+  if (!await connectAdbEndpoint(endpoint)) {
     console.error(chalk.red(`  Failed to connect to ${ip}:5555`));
     return false;
   }

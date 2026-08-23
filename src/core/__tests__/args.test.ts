@@ -18,6 +18,18 @@ describe("parseArgs", () => {
     expect(result.rest).toEqual([]);
   });
 
+  test("recognizes QR connect and APK install options", () => {
+    const result = parseArgs(["install", "--release", "--variant", "release", "--flavor", "free", "--device", "phone", "--no-build", "--no-sync"]);
+    expect(result.command).toBe("install");
+    expect(result.flags.release).toBe(true);
+    expect(result.flags.variant).toBe("release");
+    expect(result.flags.flavor).toBe("free");
+    expect(result.flags.device).toBe("phone");
+    expect(result.flags["no-build"]).toBe(true);
+    expect(result.flags["no-sync"]).toBe(true);
+    expect(parseArgs(["connect"]).errors).toEqual([]);
+  });
+
   test("command with rest args", () => {
     const result = parseArgs(["plugin", "add", "@capacitor/camera"]);
     expect(result.command).toBe("plugin");

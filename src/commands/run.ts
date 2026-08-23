@@ -1,9 +1,10 @@
 import * as p from "@clack/prompts";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join, relative, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { listAndroidDevices, connectOverWifi, loadWifiIp } from "../core/android.js";
+import { findBuiltApk } from "../core/apk.js";
+import { listAndroidDevices, connectOverWifi, loadWifiIp, reconnectSavedWirelessDevice } from "../core/android.js";
 import { requireProjectRoot, readAppId } from "../core/project.js";
 import { loadState, saveState } from "../core/state.js";
 import type { CommandContext, CommandResult } from "./types.js";
@@ -51,44 +52,7 @@ function readLauncherComponent(projectRoot: string): string | undefined {
   return `${appId}/${normalizeActivityName(appId, activityName)}`;
 }
 
-function findBuiltApk(projectRoot: string, variant: string, flavor: string): string | undefined {
-  const apkRoot = join(projectRoot, "android", "app", "build", "outputs", "apk");
-  if (!existsSync(apkRoot)) return undefined;
-
-  const files: string[] = [];
-  const stack = [apkRoot];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const fullPath = join(current, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith(".apk")) {
-        files.push(fullPath);
-      }
-    }
-  }
-
-  const normalizedFlavor = flavor.toLowerCase();
-  const normalizedVariant = variant.toLowerCase();
-  const matches = files.filter((file) => {
-    const relativePath = relative(apkRoot, file);
-    const segments = relativePath.split(sep).map((segment) => segment.toLowerCase());
-    const directories = segments.slice(0, -1);
-    const fileName = basename(file).toLowerCase();
-    return directories.includes(normalizedVariant)
-      && (!normalizedFlavor || directories.includes(normalizedFlavor))
-      && fileName.endsWith(".apk");
-  });
-
-  return matches
-    .filter((file) => !/androidtest|unaligned|unsigned/i.test(file))
-    .sort((a, b) => a.localeCompare(b))[0];
-}
-
-async function launchInstalledApp(projectRoot: string, device: string): Promise<boolean> {
+export async function launchInstalledApp(projectRoot: string, device: string): Promise<boolean> {
   const appId = readAppId(projectRoot);
   if (!appId) return false;
 
@@ -139,16 +103,20 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
   if (resolvedTarget && !requestedDeviceConnected) {
     if (readyDevices.length === 0) {
       const savedIp = loadWifiIp();
-      const shouldReconnect = quiet ? false : await p.confirm({
-        message: `Target device "${resolvedTarget}" is not connected${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try WiFi reconnect?`,
-        initialValue: true,
-      });
+      const autoReconnected = await reconnectSavedWirelessDevice(resolvedTarget ?? savedIp);
+      if (autoReconnected) {
+        resolvedTarget = autoReconnected;
+        devices = await listAndroidDevices();
+        readyDevices = devices.filter((d) => d.status === "device");
+      } else if (!quiet) {
+        const shouldReconnect = await p.confirm({
+          message: `Target device "${resolvedTarget}" is not connected${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try manual WiFi setup?`,
+          initialValue: true,
+        });
 
-      if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
+        if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
 
-      if (shouldReconnect) {
-        const ok = await connectOverWifi();
-        if (ok) {
+        if (shouldReconnect && await connectOverWifi()) {
           devices = await listAndroidDevices();
           readyDevices = devices.filter((d) => d.status === "device");
         }
@@ -164,16 +132,20 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
   if (!resolvedTarget && readyDevices.length === 0) {
     const savedIp = loadWifiIp();
-    const shouldReconnect = quiet ? false : await p.confirm({
-      message: `No ready Android device found${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try to connect over WiFi?`,
-      initialValue: true,
-    });
+    const autoReconnected = await reconnectSavedWirelessDevice(resolvedTarget ?? savedIp);
+    if (autoReconnected) {
+      resolvedTarget = autoReconnected;
+      devices = await listAndroidDevices();
+      readyDevices = devices.filter((d) => d.status === "device");
+    } else if (!quiet) {
+      const shouldReconnect = await p.confirm({
+        message: `No ready Android device found${savedIp ? ` (last WiFi: ${savedIp})` : ""}. Try manual WiFi setup?`,
+        initialValue: true,
+      });
 
-    if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
+      if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
 
-    if (shouldReconnect) {
-      const ok = await connectOverWifi();
-      if (ok) {
+      if (shouldReconnect && await connectOverWifi()) {
         devices = await listAndroidDevices();
         readyDevices = devices.filter((d) => d.status === "device");
       }
