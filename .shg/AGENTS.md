@@ -14,21 +14,22 @@ Use this guide whenever the user asks to use SHG in this project. SHG streamline
    - `bun add @capacitor/android`
    - `bunx cap add android`
 4. For normal Android testing, use the bundled workflow: `shg build` followed by `shg run`. Use `shg build --release` for a release APK and `shg build --release --aab` for a Play Store bundle.
-5. Treat `shg dev --wifi` as optional live reload for focused UI work or troubleshooting, not the default verification path. It must use the exact connected ADB endpoint and a device-reachable LAN host.
+5. Treat `shg dev --wifi` as optional live reload for focused UI work or troubleshooting, not the default verification path. `shg dev` starts or reuses the Vite server, syncs Capacitor, builds a debug Android app, installs it, and launches it; it still requires a working Android Gradle/JDK setup. For a Wi-Fi phone, use the exact connected ADB endpoint and a device-reachable LAN host, never `localhost`.
 6. Use `shg devices --wifi` to connect or pair a phone. For Android 11+, guide the user to Developer options → Wireless debugging; the pairing address and connection address can use different ports.
 7. Use `shg device status` to check whether the phone is awake or locked, and `shg device wake` (or `--keep-awake`) before interacting with a sleeping screen. A sleeping screen is controllable only while ADB still reports the device as ready; SHG must not bypass a secure lock screen.
 8. Use `shg device screenshot`, `tap`, `swipe`, `text`, `key`, `launch`, `logs`, and `dump-ui` for device-level verification. Use `--device <exact-id>` whenever more than one device is connected. Temporary screenshots and UI dumps outside the project should not be committed unless explicitly requested.
 9. After launching Android, inspect a screenshot with `view_image`. If the screen is blank or shows an error, collect filtered logcat with `shg device logs --tag Capacitor --level E`.
 10. For bundled builds, verify the embedded Capacitor config contains no `server.url`, laptop IP, or Vite dependency. If live reload fails, report the host, port, ADB target, logcat command, and screenshot path, then stop with actionable diagnostics rather than silently switching workflows.
-11. Preserve the user's source files and existing project instructions. Ask before changing signing credentials, app IDs, or release configuration.
-12. If the user asks for an interactive workflow, run plain `shg` in a real TTY and help them choose the appropriate menu item.
+11. Run `shg doctor` before Android builds and fix `Android Java target` failures before running `shg dev`, `shg build`, or `shg run`. The current Capacitor 8 setup targets Java 21, so use JDK 21+; Java 17 produces `invalid source release: 21`. If `mise` is installed, `mise use --global java@21.0.2` activates the managed JDK, then restart the shell or use `mise exec -- shg doctor`.
+12. Preserve the user's source files and existing project instructions. Ask before changing signing credentials, app IDs, or release configuration.
+13. If the user asks for an interactive workflow, run plain `shg` in a real TTY and help them choose the appropriate menu item.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `shg` | Launch interactive mode (default) |
-| `shg dev` | Optional Vite live reload + Android app |
+| `shg dev` | Build/install/launch a debug Android app with optional Vite live reload |
 | `shg doctor` | Run environment and project diagnostics |
 | `shg deploy` | Build/sync/run flows |
 | `shg setup` | Setup Capacitor dependencies and Android platform |
@@ -72,6 +73,10 @@ shg run
 
 # Optional live reload troubleshooting/UI work
 shg dev --wifi --host <LAN-IP> --port 5173
+
+# The current Capacitor 8 project needs JDK 21+
+mise use --global java@21.0.2
+shg doctor
 
 # Full deploy pipeline
 shg deploy --all --device emulator-5554 --variant debug

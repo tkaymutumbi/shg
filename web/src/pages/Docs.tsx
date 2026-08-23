@@ -187,6 +187,7 @@ const DOC_CONTENT: Record<string, DocPage> = {
     sections: [
       { id: 'install-bun', title: 'Install via Bun (Recommended)', content: 'bun install -g shg-cli', type: 'code' },
       { id: 'install-npm', title: 'Install via npm', content: 'npm install -g shg-cli', type: 'code' },
+      { id: 'android-prerequisites', title: 'Android prerequisites', content: 'Install Android Studio/platform-tools and JDK 21+ for the current Capacitor 8 Android project. Run `shg doctor` before `shg dev`, `shg build`, or `shg run`; if it reports `invalid source release: 21`, activate JDK 21 and rerun the doctor.', type: 'text' },
       { id: 'verification', title: 'Verification', content: 'shg --version\nshg doctor', type: 'code' }
     ]
   },
@@ -209,9 +210,11 @@ const DOC_CONTENT: Record<string, DocPage> = {
       { id: 'usage', title: 'Usage', content: 'shg dev [options]', type: 'code' },
       { id: 'options', title: 'Options', type: 'list', items: [
         { title: '--wifi', description: 'Connect to the device over WiFi and pass the exact ADB endpoint to Capacitor.' },
-        { title: '--host <host>', description: 'Specify the dev server host.' },
+        { title: '--host <host>', description: 'Specify the dev server host; use the laptop LAN IP for WiFi, not localhost.' },
         { title: '--port <port>', description: 'Specify the dev server port (default: 5173).' }
-      ]}
+      ]},
+      { id: 'workflow', title: 'What it does', content: 'shg dev starts or reuses Vite, syncs Capacitor, builds and installs a debug Android app, then launches it with live reload. It is optional UI development; use shg build followed by shg run for normal bundled verification.', type: 'text' },
+      { id: 'java', title: 'Java requirement', content: 'The current Capacitor 8 project targets Java 21. If Gradle reports invalid source release: 21, activate JDK 21+ (for example, mise use --global java@21.0.2), rerun shg doctor, and retry.', type: 'text' }
     ]
   },
   'shg-connect': {

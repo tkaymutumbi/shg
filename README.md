@@ -71,13 +71,13 @@ bun link
 
 - [Bun](https://bun.sh) 1.3+ (required by SHG's project workflow commands)
 - [Node.js](https://nodejs.org) 18+ (required to run the compiled CLI; Bun is still needed for the wrapped project commands)
-- [Java JDK](https://adoptium.net) 17+ (for Android builds)
+- [Java JDK](https://adoptium.net) 21+ for the current Capacitor 8 Android project (SHG reports the required target with `shg doctor`)
 - [Android SDK](https://developer.android.com/studio) with `ANDROID_HOME` or `ANDROID_SDK_ROOT` set
 - Current Android SDK Platform-Tools (`adb`) available on PATH; SHG can download a private copy when needed
 
 ### Windows
 
-SHG uses the Android Gradle wrapper (`android\gradlew.bat`) and PowerShell for its Windows platform-tools extraction path. Install Bun, Java 17+, and Android Studio with the Android SDK and platform-tools components. SHG can download a private copy of `adb.exe` when it is missing; the bundled tool is added to the current SHG process automatically. Add `%USERPROFILE%\.shg\bin` to your user `PATH` if you want that copy available in future terminals. For QR pairing, allow `adb.exe` through Windows Defender Firewall and use Windows Terminal or another terminal that preserves Unicode/ANSI output.
+SHG uses the Android Gradle wrapper (`android\gradlew.bat`) and PowerShell for its Windows platform-tools extraction path. Install Bun, Java 21+, and Android Studio with the Android SDK and platform-tools components. SHG can download a private copy of `adb.exe` when it is missing; the bundled tool is added to the current SHG process automatically. Add `%USERPROFILE%\.shg\bin` to your user `PATH` if you want that copy available in future terminals. For QR pairing, allow `adb.exe` through Windows Defender Firewall and use Windows Terminal or another terminal that preserves Unicode/ANSI output.
 
 ## Quick Start
 
@@ -165,11 +165,11 @@ shg install --no-build
 
 ### `shg dev`
 
-Start an optional Vite live-reload server and launch the Android app. Auto-installs `adb` if missing, auto-builds web assets if the output directory is empty, checks the selected host/port and Capacitor config, and detects the Android SDK even when `ANDROID_SDK_ROOT` isn't set. For normal testing use `shg build` followed by `shg run`.
+Start an optional Vite live-reload server and launch the Android app. SHG also syncs Capacitor, builds the debug Android app, installs it, and launches it, so Java/Gradle must pass `shg doctor` first. Auto-installs `adb` if missing, auto-builds web assets if the output directory is empty, checks the selected host/port and Capacitor config, and detects the Android SDK even when `ANDROID_SDK_ROOT` isn't set. For normal testing use `shg build` followed by `shg run`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--host` | `localhost`/auto | Dev server host |
+| `--host` | `localhost`/auto | Dev server host; for Wi-Fi use the laptop's LAN IP, not `localhost` |
 | `--port` | `5173` | Dev server port |
 | `--wifi` | — | Connect to device over WiFi for optional live reload |
 | `--skip-build` | — | Skip auto-build if web assets directory is missing |
@@ -196,6 +196,14 @@ shg dev --host 0.0.0.0 --port 5173
 ```
 
 > Once running, the app hot-reloads on every file save — no need to re-run the command. WiFi mode passes the exact connected ADB `IP:port` to Capacitor with `--target`; if the screen is blank, follow SHG's printed `adb`, logcat, and screenshot diagnostics.
+
+If Gradle reports `invalid source release: 21`, the project is using an older JDK. Install and activate JDK 21+, then rerun `shg doctor` before retrying:
+
+```bash
+mise use --global java@21.0.2   # when mise is installed
+shg doctor
+shg dev --wifi --host <LAPTOP-LAN-IP> --port 3000
+```
 
 ### `shg device`
 
