@@ -4,6 +4,22 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.4.4] - 2026-08-23
+
+### Added
+- **Agent-ready projects**: running SHG in a package or Git workspace creates a discoverable root `AGENTS.md` pointer and a complete `.shg/AGENTS.md` playbook
+- **Interactive device workflow**: plain `shg` now includes a dedicated Connect / List Devices flow for USB and Wi-Fi ADB
+- **Standalone Wi-Fi connection**: `shg devices --wifi` connects or pairs devices without requiring a Capacitor project
+
+### Changed
+- **Android 11+ pairing**: accepts the separate dynamic pairing and connection ports shown by Wireless debugging
+- **Agent guidance updates safely**: SHG refreshes its owned playbook and preserves existing project instructions without duplicating its managed section
+
+### Fixed
+- **Wi-Fi reliability**: validates ADB responses, retries after pairing, verifies the final device state, and does not treat offline devices as ready
+- **Legacy wireless ADB**: defaults bare device IP addresses to port 5555 while preserving explicit ports
+- **CLI workflows**: hardened project checks, device targeting, builds, configuration writes, and interactive cancellation behavior
+
 ## [2026.4.3] - 2026-06-11
 
 ### Added
