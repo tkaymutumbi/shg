@@ -77,7 +77,7 @@ bun link
 
 ### Windows
 
-SHG uses the Android Gradle wrapper (`android\gradlew.bat`) and PowerShell for its Windows platform-tools extraction path. Install Bun, Java 17+, and Android Studio with the Android SDK and platform-tools components. SHG can download a private copy of `adb.exe` when it is missing; the bundled tool is added to the current SHG process automatically. Add `%USERPROFILE%\.shg\bin` to your user `PATH` if you want that copy available in future terminals.
+SHG uses the Android Gradle wrapper (`android\gradlew.bat`) and PowerShell for its Windows platform-tools extraction path. Install Bun, Java 17+, and Android Studio with the Android SDK and platform-tools components. SHG can download a private copy of `adb.exe` when it is missing; the bundled tool is added to the current SHG process automatically. Add `%USERPROFILE%\.shg\bin` to your user `PATH` if you want that copy available in future terminals. For QR pairing, allow `adb.exe` through Windows Defender Firewall and use Windows Terminal or another terminal that preserves Unicode/ANSI output.
 
 ## Quick Start
 
