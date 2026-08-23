@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import chalk from "chalk";
-import { requireProjectRoot, emitJson, CONFIG_FILES } from "../core/project.js";
+import { requireProjectRoot, emitJson, CONFIG_FILES, extractStaticConfigValue } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 interface VersionInfo {
@@ -31,17 +31,21 @@ export function parseVersion(input: string): VersionInfo {
 function readCurrentVersion(capacitorConfigPath: string): VersionInfo | null {
   try {
     const content = readFileSync(capacitorConfigPath, "utf8");
-    const nameMatch = content.match(/versionName\s*[:=]\s*["']([^"']+)["']/);
-    const codeMatch = content.match(/versionCode\s*[:=]\s*(\d+)/);
-    if (nameMatch) {
+    const nameValue = extractStaticConfigValue(content, "versionName");
+    const codeValue = extractStaticConfigValue(content, "versionCode");
+    if (typeof nameValue === "string") {
       return {
-        versionName: nameMatch[1],
-        versionCode: codeMatch ? parseInt(codeMatch[1], 10) : 1,
+        versionName: nameValue,
+        versionCode: typeof codeValue === "number"
+          ? codeValue
+          : typeof codeValue === "string" && /^\d+$/.test(codeValue)
+            ? Number.parseInt(codeValue, 10)
+            : 1,
       };
     }
-    const simpleVersion = content.match(/version\s*[:=]\s*["']([^"']+)["']/);
-    if (simpleVersion) {
-      return parseVersion(simpleVersion[1]);
+    const simpleVersion = extractStaticConfigValue(content, "version");
+    if (typeof simpleVersion === "string") {
+      return parseVersion(simpleVersion);
     }
   } catch {}
   return null;

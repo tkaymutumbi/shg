@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { adbConnectSucceeded, normalizeAdbEndpoint, parseAdbDevices } from "../android.js";
+import { adbConnectSucceeded, isMatchingAdbEndpoint, normalizeAdbEndpoint, parseAdbDevices } from "../android.js";
 
 describe("parseAdbDevices", () => {
   test("parses device list with model info", () => {
@@ -77,5 +77,13 @@ describe("normalizeAdbEndpoint", () => {
   test("rejects invalid endpoints", () => {
     expect(normalizeAdbEndpoint("192.168.1.22:99999")).toBeUndefined();
     expect(normalizeAdbEndpoint("bad host")).toBeUndefined();
+  });
+});
+
+describe("isMatchingAdbEndpoint", () => {
+  test("requires the exact host and port", () => {
+    expect(isMatchingAdbEndpoint("192.168.1.22:5555", "192.168.1.22:5555")).toBe(true);
+    expect(isMatchingAdbEndpoint("192.168.1.23:5555", "192.168.1.22:5555")).toBe(false);
+    expect(isMatchingAdbEndpoint("192.168.1.22:5555", "192.168.1.22:5556")).toBe(false);
   });
 });

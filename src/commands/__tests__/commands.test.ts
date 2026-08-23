@@ -1,14 +1,21 @@
 import { describe, expect, test, mock, beforeEach } from "bun:test";
 import { join } from "node:path";
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 
+const execaCalls: Array<{ cmd: string; args: string[] }> = [];
+
 mock.module("execa", () => ({
-  execa: async (cmd: string, args: string[], opts: any) => ({
-    exitCode: 0,
-    stdout: "mocked",
-    stderr: "",
-  }),
+  execa: async (cmd: string, args: string[], opts: any) => {
+    execaCalls.push({ cmd, args });
+    return {
+      exitCode: 0,
+      stdout: cmd === "adb" && args[0] === "devices"
+        ? "List of devices attached\nmocked device\n"
+        : "mocked",
+      stderr: "",
+    };
+  },
   execaSync: () => ({ exitCode: 0, stdout: "mocked\n", stderr: "" }),
 }));
 
@@ -205,6 +212,45 @@ describe("runBuild", () => {
   test("json output", async () => {
     const result = await runBuild(makeContext({ flags: { release: true }, json: true }));
     expect(result.exitCode).toBe(0);
+  });
+});
+
+describe("runDeploy", () => {
+  test("build step produces an Android artifact instead of only running the web build", async () => {
+    execaCalls.length = 0;
+    const result = await runDeploy(makeContext({ flags: { build: true } }));
+
+    expect(result.exitCode).toBe(0);
+    expect(execaCalls.some(({ cmd, args }) => cmd === "bun" && args.join(" ") === "run build")).toBe(true);
+    expect(execaCalls.some(({ args }) => args.includes("assembleDebug"))).toBe(true);
+  });
+});
+
+describe("runRun", () => {
+  test("reuses the last successful variant from state", async () => {
+    execaCalls.length = 0;
+    const project = mkdtempSync(join(tmpdir(), "shg-run-state-"));
+    writeFileSync(join(project, "capacitor.config.json"), JSON.stringify({ appId: "com.test.app", webDir: "dist" }));
+    mkdirSync(join(project, ".shg"));
+    writeFileSync(join(project, ".shg", "state.json"), JSON.stringify({
+      lastDeviceId: "mocked",
+      lastVariant: "release",
+      lastFlavor: "demo",
+    }));
+
+    const result = await runRun(makeContext({
+      projectRoot: project,
+      config: { ...makeContext().config, autoSyncBeforeRun: false },
+      flags: { __silent: true },
+    }));
+
+    expect(result.exitCode).toBe(0);
+    const capRun = execaCalls.find(({ cmd, args }) => cmd === "bunx" && args[0] === "cap" && args[1] === "run");
+    expect(capRun?.args).toContain("--configuration");
+    expect(capRun?.args).toContain("release");
+    expect(capRun?.args).toContain("--flavor");
+    expect(capRun?.args).toContain("demo");
+    rmSync(project, { recursive: true, force: true });
   });
 });
 

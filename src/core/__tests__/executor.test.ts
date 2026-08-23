@@ -63,6 +63,22 @@ describe("runCommand", () => {
       stdio: "pipe",
       reject: false,
       env: { FOO: "bar" },
+      timeout: 300000,
+    });
+  });
+
+  test("allows intentionally long-running commands to disable the timeout", async () => {
+    await runCommand(
+      { label: "logcat", cmd: "adb", args: ["logcat"], timeout: 0 },
+      { stdio: "pipe" },
+    );
+
+    expect(mockExeca).toHaveBeenLastCalledWith("adb", ["logcat"], {
+      cwd: undefined,
+      stdio: "pipe",
+      reject: false,
+      env: undefined,
+      timeout: undefined,
     });
   });
 });

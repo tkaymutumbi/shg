@@ -1,11 +1,15 @@
 import { execa } from "execa";
 
+export const DEFAULT_COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
+
 export interface CommandSpec {
   label: string;
   cmd: string;
   args: string[];
   cwd?: string;
   env?: Record<string, string>;
+  /** Set to 0 for intentionally long-running commands such as logcat. */
+  timeout?: number;
 }
 
 export interface ExecutorOptions {
@@ -26,6 +30,9 @@ export async function runCommand(
   options: ExecutorOptions = {},
 ): Promise<ExecResult> {
   const { verbose = false, stdio = "inherit" } = options;
+  const timeout = spec.timeout === 0
+    ? undefined
+    : spec.timeout ?? DEFAULT_COMMAND_TIMEOUT_MS;
 
   if (verbose) {
     console.log(`[shg] ${spec.cmd} ${spec.args.join(" ")}`);
@@ -37,6 +44,7 @@ export async function runCommand(
       stdio,
       reject: false,
       env: spec.env,
+      timeout,
     });
 
     return {
@@ -44,6 +52,7 @@ export async function runCommand(
       code: result.exitCode ?? 1,
       stdout: result.stdout ?? "",
       stderr: result.stderr ?? "",
+      errorMessage: result.timedOut ? `Command timed out after ${timeout}ms.` : undefined,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown execution failure";

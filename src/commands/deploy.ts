@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { requireProjectRoot, emitJson } from "../core/project.js";
+import { runBuild } from "./build.js";
 import { runDoctor } from "./doctor.js";
 import { runRun } from "./run.js";
 import type { CommandContext, CommandResult } from "./types.js";
@@ -49,26 +50,29 @@ export async function runDeploy(context: CommandContext): Promise<CommandResult>
   }
 
   const steps = selectedDeploySteps(context.flags);
+  let buildIncludedSync = false;
 
   for (const step of steps) {
     if (step === "build") {
-      const buildResult = await runCommand(
-        {
-          label: "bun run build",
-          cmd: "bun",
-          args: ["run", "build"],
-          cwd: projectRoot,
+      const buildResult = await runBuild({
+        ...context,
+        json: false,
+        config: {
+          ...context.config,
+          output: { ...context.config.output, json: false },
         },
-        { verbose: context.verbose && !json, stdio: json ? "pipe" : "inherit" },
-      );
-      if (!buildResult.success) {
-        if (json) emitJson({ success: false, step: "build", error: buildResult.stderr || buildResult.errorMessage });
+        flags: { ...context.flags, __silent: json },
+      });
+      if (buildResult.exitCode !== 0) {
+        if (json) emitJson({ success: false, step: "build" });
         else console.error(chalk.red("Deploy failed at build step."));
         return { exitCode: 1 };
       }
+      buildIncludedSync = !Boolean(context.flags["no-sync"]);
     }
 
     if (step === "sync") {
+      if (buildIncludedSync) continue;
       const syncResult = await runCommand(
         {
           label: "bunx cap sync android",

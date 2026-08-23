@@ -74,10 +74,15 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   }
 
   const wifi = Boolean(context.flags.wifi);
-  let host = typeof context.flags.host === "string" ? context.flags.host : (wifi ? (getLanIp() ?? "0.0.0.0") : "localhost");
+  const explicitHost = typeof context.flags.host === "string" ? context.flags.host : undefined;
+  let host = explicitHost ?? (wifi ? getLanIp() : "localhost");
   let port = typeof context.flags.port === "string" ? context.flags.port : "5173";
   const explicitPort = typeof context.flags.port === "string";
   const portNumber = Number(port);
+  if (!host) {
+    console.error(chalk.red("Could not determine a LAN IP for Wi-Fi live reload. Pass --host <LAN-IP> explicitly."));
+    return { exitCode: 2 };
+  }
   if (!host.trim()) {
     console.error(chalk.red("Host cannot be empty."));
     return { exitCode: 2 };
@@ -106,6 +111,8 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   if (!sdkRoot || !hasValidAndroidSdk()) {
     const found = findAndroidSdkRoot();
     if (found) {
+      process.env.ANDROID_SDK_ROOT = found;
+      process.env.ANDROID_HOME = found;
       console.log(chalk.cyan(`Android SDK detected at: ${found}`));
     } else {
       console.error(chalk.red("No valid Android SDK found."));
@@ -196,7 +203,12 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
   }
 
   if (usingWifi && !context.flags.host && (host === "localhost" || host === "0.0.0.0")) {
-    host = getLanIp() ?? "0.0.0.0";
+    const detectedLanIp = getLanIp();
+    if (!detectedLanIp) {
+      console.error(chalk.red("Could not determine a LAN IP for Wi-Fi live reload. Pass --host <LAN-IP> explicitly."));
+      return { exitCode: 2 };
+    }
+    host = detectedLanIp;
   }
 
   let startedDevServer = false;
@@ -244,6 +256,7 @@ export async function runDev(context: CommandContext): Promise<CommandResult> {
       cmd: "bunx",
       args: ["cap", "run", "android", "--live-reload", `--host=${host}`, `--port=${port}`],
       cwd: projectRoot,
+      timeout: 0,
     },
     { verbose: context.verbose, stdio: "inherit" },
   );

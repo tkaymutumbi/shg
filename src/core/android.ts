@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, symlinkSync, chmodSync, unlinkSync, copyFileSync } from "node:fs";
 import * as p from "@clack/prompts";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { homedir, networkInterfaces } from "node:os";
+import { execaSync } from "execa";
 import { runCommand } from "./executor.js";
 import { readJsonFile, writeJsonFile } from "./fsjson.js";
 import chalk from "chalk";
@@ -32,7 +33,7 @@ export function parseAdbDevices(output: string): AndroidDevice[] {
 
 export async function listAndroidDevices(): Promise<AndroidDevice[]> {
   const result = await runCommand(
-    { label: "adb devices -l", cmd: "adb", args: ["devices", "-l"] },
+    { label: "adb devices -l", cmd: "adb", args: ["devices", "-l"], timeout: 10_000 },
     { stdio: "pipe" },
   );
 
@@ -59,6 +60,40 @@ function getShgBinDir(): string {
   return join(homedir(), ".shg", "bin");
 }
 
+function addToCurrentPath(directory: string): void {
+  const currentPath = process.env.PATH ?? "";
+  const entries = currentPath.split(delimiter).filter(Boolean);
+  const comparable = process.platform === "win32"
+    ? directory.toLowerCase()
+    : directory;
+  const alreadyPresent = entries.some((entry) => (
+    process.platform === "win32" ? entry.toLowerCase() : entry
+  ) === comparable);
+
+  if (!alreadyPresent) {
+    process.env.PATH = [directory, ...entries].join(delimiter);
+  }
+}
+
+function exposeBundledBinary(binary: string, sourcePath: string): void {
+  const bunBin = join(homedir(), ".bun", "bin");
+  if (!existsSync(bunBin)) return;
+
+  const extension = process.platform === "win32" ? ".exe" : "";
+  const targetPath = join(bunBin, binary + extension);
+  if (existsSync(targetPath)) return;
+
+  try {
+    symlinkSync(sourcePath, targetPath);
+  } catch {
+    // Windows may reject symlink creation without Developer Mode or elevation.
+    // A copy still makes the bundled tool available from Bun's normal bin dir.
+    try {
+      copyFileSync(sourcePath, targetPath);
+    } catch {}
+  }
+}
+
 export function adbConnectSucceeded(result: Pick<ExecResult, "success" | "stdout" | "stderr">): boolean {
   if (!result.success) return false;
   const output = `${result.stdout}\n${result.stderr}`;
@@ -76,12 +111,15 @@ export function normalizeAdbEndpoint(value: string, defaultPort = 5555): string 
   return `${match[1]}:${port}`;
 }
 
+export function isMatchingAdbEndpoint(deviceId: string, endpoint: string): boolean {
+  return deviceId.trim().toLowerCase() === endpoint.trim().toLowerCase();
+}
+
 async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Promise<boolean> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const devices = await listAndroidDevices();
-    const port = endpoint.slice(endpoint.lastIndexOf(":"));
-    if (devices.some((device) => device.status === "device" && (device.id === endpoint || device.id.endsWith(port)))) return true;
+    if (devices.some((device) => device.status === "device" && isMatchingAdbEndpoint(device.id, endpoint))) return true;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return false;
@@ -90,7 +128,7 @@ async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Pro
 async function connectEndpoint(endpoint: string): Promise<boolean> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const result = await runCommand(
-      { label: "adb connect", cmd: "adb", args: ["connect", endpoint] },
+      { label: "adb connect", cmd: "adb", args: ["connect", endpoint], timeout: 15_000 },
       { stdio: "pipe" },
     );
     if (adbConnectSucceeded(result) && await waitForConnectedEndpoint(endpoint)) return true;
@@ -113,16 +151,18 @@ export async function ensureAdb(): Promise<boolean> {
   const adbPath = join(shgBin, process.platform === "win32" ? "adb.exe" : "adb");
 
   if (existsSync(adbPath)) {
-    const binDir = join(homedir(), ".bun", "bin");
-    if (existsSync(binDir)) {
-      try {
-        const linkPath = join(binDir, "adb");
-        if (existsSync(linkPath)) unlinkSync(linkPath);
-        symlinkSync(adbPath, linkPath);
-        console.log(chalk.green("  adb linked from ~/.shg/bin to ~/.bun/bin"));
-        return true;
-      } catch {}
+    addToCurrentPath(shgBin);
+    exposeBundledBinary("adb", adbPath);
+    const bundledCheck = await runCommand(
+      { label: "bundled adb version", cmd: adbPath, args: ["version"] },
+      { stdio: "pipe" },
+    );
+    if (bundledCheck.success) {
+      console.log(chalk.green("  Using the bundled adb from ~/.shg/bin for this run."));
+      return true;
     }
+    console.log(chalk.red("  The bundled adb could not be started."));
+    return false;
   }
 
   const shouldInstall = await p.confirm({
@@ -160,7 +200,7 @@ export async function ensureAdb(): Promise<boolean> {
 
   if (process.platform === "win32") {
     const extractResult = await runCommand(
-      { label: "unzip platform-tools", cmd: "powershell", args: ["Expand-Archive", "-Path", zipPath, "-DestinationPath", tmpDir, "-Force"] },
+      { label: "unzip platform-tools", cmd: "powershell.exe", args: ["Expand-Archive", "-Path", zipPath, "-DestinationPath", tmpDir, "-Force"] },
       { stdio: "pipe" },
     );
     if (!extractResult.success) {
@@ -190,16 +230,11 @@ export async function ensureAdb(): Promise<boolean> {
     try {
       copyFileSync(src, dest);
       if (process.platform !== "win32") chmodSync(dest, 0o755);
-
-      const bunBin = join(homedir(), ".bun", "bin");
-      if (existsSync(bunBin)) {
-        const linkPath = join(bunBin, bin);
-        if (existsSync(linkPath)) unlinkSync(linkPath);
-        symlinkSync(dest, linkPath);
-      }
+      exposeBundledBinary(bin, dest);
     } catch {}
   }
 
+  addToCurrentPath(shgBin);
   const verCheck = await runCommand(
     { label: "adb version", cmd: "adb", args: ["version"] },
     { stdio: "pipe" },
@@ -211,9 +246,15 @@ export async function ensureAdb(): Promise<boolean> {
   }
 
   if (existsSync(adbPath)) {
-    console.log(chalk.yellow("  adb installed to ~/.shg/bin. Add it to PATH or restart your terminal."));
-    s.stop("adb installed (may need PATH update).");
-    return true;
+    const bundledCheck = await runCommand(
+      { label: "bundled adb version", cmd: adbPath, args: ["version"] },
+      { stdio: "pipe" },
+    );
+    if (bundledCheck.success) {
+      console.log(chalk.yellow("  adb installed to ~/.shg/bin for this run. Add that directory to PATH for future terminals."));
+      s.stop("adb installed successfully.");
+      return true;
+    }
   }
 
   s.stop("Installation incomplete.");
@@ -223,17 +264,24 @@ export async function ensureAdb(): Promise<boolean> {
 
 export async function getDeviceIp(deviceId?: string): Promise<string | undefined> {
   const prefix = deviceId ? ["-s", deviceId] : [];
+  const routeResult = await runCommand(
+    { label: "adb get device route", cmd: "adb", args: [...prefix, "shell", "ip", "route", "get", "1.1.1.1"], timeout: 10_000 },
+    { stdio: "pipe" },
+  );
+  const routeMatch = routeResult.stdout.match(/\bsrc\s+(\d+\.\d+\.\d+\.\d+)/);
+  if (routeResult.success && routeMatch) return routeMatch[1];
+
   const args = [...prefix, "shell", "ip", "-o", "-4", "addr", "show", "scope", "global"];
 
   const result = await runCommand(
-    { label: "adb get device ip", cmd: "adb", args },
+    { label: "adb get device ip", cmd: "adb", args, timeout: 10_000 },
     { stdio: "pipe" },
   );
 
   const directMatch = result.stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
   if (!result.success || !directMatch) {
     const ifconfigResult = await runCommand(
-      { label: "adb get device ip (fallback)", cmd: "adb", args: [...prefix, "shell", "ifconfig"] },
+      { label: "adb get device ip (fallback)", cmd: "adb", args: [...prefix, "shell", "ifconfig"], timeout: 10_000 },
       { stdio: "pipe" },
     );
     if (!ifconfigResult.success) return undefined;
@@ -392,18 +440,46 @@ export async function connectOverWifi(): Promise<boolean> {
   return true;
 }
 
-export function getLanIp(): string {
+function isUsableLanIp(value: string): boolean {
+  return value !== "0.0.0.0" && !value.startsWith("127.");
+}
+
+function getDefaultRouteIp(): string | undefined {
+  try {
+    const result = process.platform === "win32"
+      ? execaSync("route", ["print", "-4", "0.0.0.0"], { reject: false })
+      : execaSync("ip", ["-4", "route", "get", "1.1.1.1"], { reject: false });
+    if (result.exitCode !== 0) return undefined;
+
+    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    const match = process.platform === "win32"
+      ? output.match(/^\s*0\.0\.0\.0\s+0\.0\.0\.0\s+\S+\s+(\d+\.\d+\.\d+\.\d+)/m)
+      : output.match(/\bsrc\s+(\d+\.\d+\.\d+\.\d+)/);
+    return match && isUsableLanIp(match[1]) ? match[1] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function getLanIp(): string | undefined {
+  const routeIp = getDefaultRouteIp();
+  if (routeIp) return routeIp;
+
   const interfaces = networkInterfaces();
   const names = Object.keys(interfaces).sort((a, b) => {
-    const score = (name: string) => /^(wl|wifi|en|eth)/i.test(name) ? 0 : /^(docker|veth|br-|vir|tun|tap|tailscale)/i.test(name) ? 2 : 1;
+    const score = (name: string) => /^(wl|wlan|wi[-_ ]?fi|en|eth|ethernet)/i.test(name)
+      ? 0
+      : /^(docker|veth|vEthernet|br-|vir|tun|tap|tailscale)/i.test(name)
+        ? 2
+        : 1;
     return score(a) - score(b);
   });
   for (const name of names) {
     for (const iface of interfaces[name] ?? []) {
       if (iface.family === "IPv4" && !iface.internal) {
-        return iface.address;
+        if (isUsableLanIp(iface.address)) return iface.address;
       }
     }
   }
-  return "localhost";
+  return undefined;
 }

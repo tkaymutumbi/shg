@@ -26,6 +26,7 @@ export async function runLogs(context: CommandContext): Promise<CommandResult> {
       cmd: "adb",
       args: ["logcat", "-s", filter],
       cwd: context.projectRoot ?? process.cwd(),
+      timeout: 0,
     },
     { verbose: context.verbose, stdio: "inherit" },
   );

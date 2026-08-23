@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join, relative, sep } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
 import { listAndroidDevices, connectOverWifi, loadWifiIp } from "../core/android.js";
@@ -21,7 +21,7 @@ function resolveRunValues(projectRoot: string, context: CommandContext) {
   const state = loadState(projectRoot);
   return {
     device: getStringFlag(context.flags, "device") || context.config.defaultDeviceId || state.lastDeviceId,
-    variant: getStringFlag(context.flags, "variant") || context.config.defaultVariant || state.lastVariant || "debug",
+    variant: getStringFlag(context.flags, "variant") || state.lastVariant || context.config.defaultVariant || "debug",
     flavor: getStringFlag(context.flags, "flavor") || context.config.defaultFlavor || state.lastFlavor || "",
   };
 }
@@ -74,9 +74,13 @@ function findBuiltApk(projectRoot: string, variant: string, flavor: string): str
   const normalizedFlavor = flavor.toLowerCase();
   const normalizedVariant = variant.toLowerCase();
   const matches = files.filter((file) => {
-    const normalizedPath = file.toLowerCase();
-    return normalizedPath.includes(normalizedVariant)
-      && (!normalizedFlavor || normalizedPath.includes(normalizedFlavor));
+    const relativePath = relative(apkRoot, file);
+    const segments = relativePath.split(sep).map((segment) => segment.toLowerCase());
+    const directories = segments.slice(0, -1);
+    const fileName = basename(file).toLowerCase();
+    return directories.includes(normalizedVariant)
+      && (!normalizedFlavor || directories.includes(normalizedFlavor))
+      && fileName.endsWith(".apk");
   });
 
   return matches

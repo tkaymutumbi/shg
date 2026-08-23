@@ -67,10 +67,15 @@ bun link
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) 1.3+ or [Node.js](https://nodejs.org) 18+
+- [Bun](https://bun.sh) 1.3+ (required by SHG's project workflow commands)
+- [Node.js](https://nodejs.org) 18+ (required to run the compiled CLI; Bun is still needed for the wrapped project commands)
 - [Java JDK](https://adoptium.net) 17+ (for Android builds)
 - [Android SDK](https://developer.android.com/studio) with `ANDROID_HOME` or `ANDROID_SDK_ROOT` set
 - `adb` available on PATH
+
+### Windows
+
+SHG uses the Android Gradle wrapper (`android\gradlew.bat`) and PowerShell for its Windows platform-tools extraction path. Install Bun, Java 17+, and Android Studio with the Android SDK and platform-tools components. SHG can download a private copy of `adb.exe` when it is missing; the bundled tool is added to the current SHG process automatically. Add `%USERPROFILE%\.shg\bin` to your user `PATH` if you want that copy available in future terminals.
 
 ## Quick Start
 

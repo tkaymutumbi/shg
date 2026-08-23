@@ -55,7 +55,98 @@ export function readAppId(projectRoot: string): string | undefined {
   return readCapacitorConfigValue(projectRoot, "appId");
 }
 
-function readCapacitorConfigValue(projectRoot: string, key: string): string | undefined {
+function maskJavaScriptComments(source: string): string {
+  let result = "";
+  let state: "code" | "single" | "double" | "template" | "line-comment" | "block-comment" = "code";
+
+  for (let index = 0; index < source.length; index += 1) {
+    const current = source[index];
+    const next = source[index + 1];
+
+    if (state === "code") {
+      if (current === "/" && next === "/") {
+        result += "  ";
+        index += 1;
+        state = "line-comment";
+      } else if (current === "/" && next === "*") {
+        result += "  ";
+        index += 1;
+        state = "block-comment";
+      } else {
+        result += current;
+        if (current === "'") state = "single";
+        else if (current === '"') state = "double";
+        else if (current === "`") state = "template";
+      }
+      continue;
+    }
+
+    if (state === "line-comment") {
+      if (current === "\n") {
+        result += current;
+        state = "code";
+      } else {
+        result += " ";
+      }
+      continue;
+    }
+
+    if (state === "block-comment") {
+      if (current === "*" && next === "/") {
+        result += "  ";
+        index += 1;
+        state = "code";
+      } else {
+        result += current === "\n" ? "\n" : " ";
+      }
+      continue;
+    }
+
+    result += current;
+    if (current === "\\") {
+      if (index + 1 < source.length) {
+        result += source[index + 1];
+        index += 1;
+      }
+    } else if ((state === "single" && current === "'")
+      || (state === "double" && current === '"')
+      || (state === "template" && current === "`")) {
+      state = "code";
+    }
+  }
+
+  return result;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseStaticLiteral(match: RegExpMatchArray | null): string | number | undefined {
+  if (!match) return undefined;
+  if (match[2] !== undefined) return match[2];
+  if (match[3] !== undefined) return match[3].includes("${") ? undefined : match[3];
+  if (match[4] !== undefined) return Number.parseFloat(match[4]);
+  return undefined;
+}
+
+export function extractStaticConfigValue(source: string, key: string): string | number | undefined {
+  const masked = maskJavaScriptComments(source);
+  const escapedKey = escapeRegExp(key);
+  const literalPattern = `(?:(['"])([^'"\\r\\n]*)\\1|\\x60([^\\x60\\r\\n]*)\\x60|(\\d+(?:\\.\\d+)?))`;
+  const propertyPrefix = `(?:^|[,{])\\s*(?:['"]${escapedKey}['"]|${escapedKey})\\s*:\\s*`;
+
+  const direct = masked.match(new RegExp(`${propertyPrefix}${literalPattern}`, "m"));
+  const directValue = parseStaticLiteral(direct);
+  if (directValue !== undefined) return directValue;
+
+  const reference = masked.match(new RegExp(`${propertyPrefix}([A-Za-z_$][\\w$]*)`, "m"));
+  const variableName = reference?.[1] ?? key;
+  const assignment = masked.match(new RegExp(`(?:const|let|var)\\s+${escapeRegExp(variableName)}\\s*=\\s*${literalPattern}`, "m"));
+  return parseStaticLiteral(assignment);
+}
+
+export function readCapacitorConfigValue(projectRoot: string, key: string): string | undefined {
   const configFile = CONFIG_FILES.find((f) => existsSync(join(projectRoot, f)));
   if (!configFile) return undefined;
 
@@ -68,8 +159,8 @@ function readCapacitorConfigValue(projectRoot: string, key: string): string | un
       return typeof value === "string" ? value : undefined;
     }
 
-    const match = raw.match(new RegExp(`${key}\\s*[:=]\\s*['"]([^'"]+)['"]`));
-    return match?.[1];
+    const value = extractStaticConfigValue(raw, key);
+    return typeof value === "string" ? value : undefined;
   } catch {
     return undefined;
   }
