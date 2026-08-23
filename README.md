@@ -42,7 +42,7 @@ The project also includes a [documentation website](web/) (React + Vite) with fu
 - **Build APK/AAB** — Debug or release builds via Gradle, no Android Studio needed
 - **Plugin Management** — Add, list, and sync Capacitor plugins
 - **Diagnostics** — Check Node, Java, adb, Android SDK, Gradle, Capacitor deps, and Java target mismatches
-- **Device Management** — List ADB devices with model info
+- **Device Control** — Inspect, wake, screenshot, tap, swipe, type, launch, inspect UI, and run targeted ADB commands
 - **Logcat Viewer** — Tail filtered Android logs with `shg logs`
 - **Asset Generation** — Validate project icon sources and generate Android icons/splash screens via `@capacitor/assets`
 - **Version Bumping** — Bump `versionName`/`versionCode` in JSON config and Android Gradle files
@@ -88,6 +88,8 @@ shg doctor --fix
 shg setup --install --add-android
 shg build                            # Bundled debug APK
 shg run                              # Install and launch it
+shg device status                    # Inspect the connected phone
+shg device screenshot                # Capture a temporary screen image
 shg dev --wifi --host <LAN-IP>       # Optional live reload
 shg deploy --all --device emulator-5554
 ```
@@ -153,7 +155,29 @@ shg dev --host 0.0.0.0 --port 5173
 
 > Once running, the app hot-reloads on every file save — no need to re-run the command. WiFi mode passes the exact connected ADB `IP:port` to Capacitor with `--target`; if the screen is blank, follow SHG's printed `adb`, logcat, and screenshot diagnostics.
 
-### `shg screenshot`
+### `shg device`
+
+Control and inspect a connected Android device through ADB. Device commands work from any directory for device-level actions; `launch` uses the current Capacitor project's app ID unless `--package` is provided.
+
+```bash
+shg device list
+shg device status --device 192.168.1.179:44893
+shg device wake --keep-awake
+shg device screenshot --device 192.168.1.179:44893
+shg device tap 540 1200 --wake
+shg device swipe 540 1200 540 300 500
+shg device text "hello world" --wake
+shg device key back
+shg device launch
+shg device launch --package com.example.other
+shg device logs --tag Capacitor --level E
+shg device dump-ui --output /tmp/window.xml
+shg device shell dumpsys activity top
+```
+
+Use `--device <exact-id>` when more than one device is connected. `--wake` wakes the display before tap, swipe, text, or launch. `--keep-awake` also asks Android to stay awake while connected. SHG can wake a sleeping device only while ADB remains connected; it cannot bypass a secure PIN, pattern, or biometric lock. WiFi ADB may still disconnect when Android suspends the network.
+
+`shg screenshot` remains available as a compatibility alias:
 
 Capture a temporary PNG from the selected Android device for visual inspection. The default output is outside the project; inspect the printed path with `view_image` and do not commit it.
 

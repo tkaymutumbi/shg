@@ -21,6 +21,7 @@ describe("SHG agent instructions", () => {
     expect(rootDoc).toContain(".shg/AGENTS.md");
     expect(playbook).toContain("How to help the user");
     expect(playbook).toContain("shg devices --wifi");
+    expect(playbook).toContain("shg device status");
 
     rmSync(root, { recursive: true, force: true });
   });

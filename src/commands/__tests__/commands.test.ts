@@ -67,6 +67,7 @@ const { runDoctor } = await import("../doctor.js");
 const { runConfig } = await import("../config.js");
 const { runBump } = await import("../bump.js");
 const { runDev, buildLiveReloadArgs } = await import("../dev.js");
+const { runDevice, normalizeKeyEvent, parseDevicePowerState } = await import("../device.js");
 const { runPlugin } = await import("../plugin.js");
 const { runRun } = await import("../run.js");
 const { runDeploy } = await import("../deploy.js");
@@ -106,6 +107,49 @@ describe("runDevices", () => {
   test("rejects interactive WiFi setup in json mode", async () => {
     const result = await runDevices(makeContext({ json: true, flags: { wifi: true } }));
     expect(result.exitCode).toBe(2);
+  });
+});
+
+describe("runDevice", () => {
+  test("sends a tap to an explicitly selected device", async () => {
+    execaCalls.length = 0;
+    const result = await runDevice(makeContext({ flags: { device: "mocked" } }), ["tap", "10", "20"]);
+    expect(result.exitCode).toBe(0);
+    expect(execaCalls.some(({ cmd, args }) => (
+      cmd === "adb" && args.join(" ") === "-s mocked shell input tap 10 20"
+    ))).toBe(true);
+  });
+
+  test("wakes a device and enables keep-awake when requested", async () => {
+    execaCalls.length = 0;
+    const result = await runDevice(makeContext({ flags: { device: "mocked", "keep-awake": true } }), ["wake"]);
+    expect(result.exitCode).toBe(0);
+    expect(execaCalls.some(({ cmd, args }) => cmd === "adb" && args.join(" ") === "-s mocked shell input keyevent KEYCODE_WAKEUP")).toBe(true);
+    expect(execaCalls.some(({ cmd, args }) => cmd === "adb" && args.join(" ") === "-s mocked shell svc power stayon true")).toBe(true);
+  });
+
+  test("normalizes friendly key names", () => {
+    expect(normalizeKeyEvent("back")).toBe("KEYCODE_BACK");
+    expect(normalizeKeyEvent("KEYCODE_ENTER")).toBe("KEYCODE_ENTER");
+    expect(normalizeKeyEvent("66")).toBe("66");
+  });
+
+  test("reports sleep and lock state from adb output", () => {
+    expect(parseDevicePowerState("mWakefulness=Asleep\nmInteractive=false", "mIsShowing=true\nisKeyguardShowing=true")).toEqual({
+      screen: "off",
+      locked: "locked",
+      wakefulness: "Asleep",
+    });
+    expect(parseDevicePowerState("mWakefulness=Awake\nmInteractive=true", "mShowingLockscreen=false")).toEqual({
+      screen: "on",
+      locked: "unlocked",
+      wakefulness: "Awake",
+    });
+  });
+
+  test("does not treat a non-XML UI dump response as success", async () => {
+    const result = await runDevice(makeContext({ flags: { device: "mocked" } }), ["dump-ui"]);
+    expect(result.exitCode).toBe(1);
   });
 });
 

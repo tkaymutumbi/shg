@@ -32,6 +32,15 @@ describe("parseArgs", () => {
     expect(result.errors).toEqual([]);
   });
 
+  test("device command preserves its subcommand and action flags", () => {
+    const result = parseArgs(["device", "tap", "10", "20", "--device", "emulator-5554", "--wake"]);
+    expect(result.command).toBe("device");
+    expect(result.rest).toEqual(["tap", "10", "20"]);
+    expect(result.flags.device).toBe("emulator-5554");
+    expect(result.flags.wake).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
   test("unknown command produces error", () => {
     const result = parseArgs(["foobar"]);
     expect(result.errors).toContain("Unknown command: foobar");

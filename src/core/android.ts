@@ -142,6 +142,36 @@ export function selectConnectedWifiEndpoint(
   return readyWireless.find((device) => Boolean(normalizeAdbEndpoint(device.id)))?.id ?? readyWireless[0].id;
 }
 
+/**
+ * Select one ready ADB target for device-level commands.
+ *
+ * An explicit target always wins. When there is only one ready device it is
+ * safe to use it directly; with several devices, prefer an exact wireless
+ * endpoint so an mDNS alias cannot make ADB act on an ambiguous duplicate.
+ */
+export function selectReadyAndroidTarget(
+  devices: AndroidDevice[],
+  preferredEndpoint?: string,
+): string | undefined {
+  const ready = devices.filter((device) => device.status === "device");
+  if (ready.length === 0) return undefined;
+
+  if (preferredEndpoint) {
+    const preferred = preferredEndpoint.trim().toLowerCase();
+    const preferredNormalized = normalizeAdbEndpoint(preferredEndpoint)?.toLowerCase();
+    const exact = ready.find((device) => {
+      const id = device.id.trim().toLowerCase();
+      return id === preferred
+        || (preferredNormalized && normalizeAdbEndpoint(device.id)?.toLowerCase() === preferredNormalized);
+    });
+    if (exact) return exact.id;
+    return undefined;
+  }
+
+  if (ready.length === 1) return ready[0].id;
+  return selectConnectedWifiEndpoint(ready);
+}
+
 async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Promise<string | undefined> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {

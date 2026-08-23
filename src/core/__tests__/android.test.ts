@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { adbConnectSucceeded, isMatchingAdbEndpoint, normalizeAdbEndpoint, parseAdbDevices, selectConnectedWifiEndpoint } from "../android.js";
+import { adbConnectSucceeded, isMatchingAdbEndpoint, normalizeAdbEndpoint, parseAdbDevices, selectConnectedWifiEndpoint, selectReadyAndroidTarget } from "../android.js";
 
 describe("parseAdbDevices", () => {
   test("parses device list with model info", () => {
@@ -104,5 +104,22 @@ adb-123._adb-tls-connect._tcp\tdevice\tmodel:Phone
 
     expect(selectConnectedWifiEndpoint(devices, "192.168.1.180:5555")).toBe("192.168.1.180:5555");
     expect(selectConnectedWifiEndpoint(devices, "192.168.1.181:5555")).toBe("192.168.1.179:44893");
+  });
+});
+
+describe("selectReadyAndroidTarget", () => {
+  test("does not silently switch away from an explicit target", () => {
+    const devices = parseAdbDevices(`List of devices attached
+emulator-5554\tdevice
+192.168.1.179:44893\tdevice
+`);
+
+    expect(selectReadyAndroidTarget(devices, "missing-device")).toBeUndefined();
+    expect(selectReadyAndroidTarget(devices, "192.168.1.179:44893")).toBe("192.168.1.179:44893");
+  });
+
+  test("selects a sole ready device when no target is requested", () => {
+    const devices = parseAdbDevices("List of devices attached\nemulator-5554\tdevice\n");
+    expect(selectReadyAndroidTarget(devices)).toBe("emulator-5554");
   });
 });

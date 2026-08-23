@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import chalk from "chalk";
 import { ensureAdb, listAndroidDevices, loadWifiIp, selectConnectedWifiEndpoint } from "../core/android.js";
-import { emitJson, requireProjectRoot } from "../core/project.js";
+import { emitJson } from "../core/project.js";
 import type { CommandContext, CommandResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -16,10 +16,6 @@ function getStringFlag(flags: Record<string, string | boolean>, name: string): s
 }
 
 export async function runScreenshot(context: CommandContext): Promise<CommandResult> {
-  // Keep the command available from a project root, matching the other
-  // Android workflows, while allowing the actual device capture to remain
-  // independent of the web build.
-  if (!requireProjectRoot(context, "Screenshot")) return { exitCode: 1 };
   if (!await ensureAdb()) return { exitCode: 1 };
 
   const devices = (await listAndroidDevices()).filter((device) => device.status === "device");

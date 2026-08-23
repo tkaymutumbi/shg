@@ -111,6 +111,7 @@ const NAVIGATION: Record<string, NavigationGroup[]> = {
         { id: 'shg-doctor', label: 'shg doctor' },
         { id: 'shg-setup', label: 'shg setup' },
         { id: 'shg-assets', label: 'shg assets' },
+        { id: 'shg-device', label: 'shg device' },
         { id: 'shg-screenshot', label: 'shg screenshot' },
       ]
     },
@@ -194,7 +195,7 @@ const DOC_CONTENT: Record<string, DocPage> = {
     sections: [
       { id: 'doctor-code', title: '1. Run Diagnostics', content: 'shg doctor --fix', type: 'code' },
       { id: 'setup-code', title: '2. Setup Project', content: 'shg setup --install --add-android', type: 'code' },
-      { id: 'build-code', title: '3. Build and Launch', content: 'shg build\nshg run\nshg screenshot', type: 'code' },
+      { id: 'build-code', title: '3. Build and Launch', content: 'shg build\nshg run\nshg device status\nshg device screenshot', type: 'code' },
       { id: 'dev-code', title: 'Optional Live Reload', content: 'shg dev --wifi --host <LAN-IP> --port 5173', type: 'code' }
     ]
   },
@@ -218,6 +219,22 @@ const DOC_CONTENT: Record<string, DocPage> = {
     sections: [
       { id: 'usage', title: 'Usage', content: 'shg screenshot\nshg screenshot --device <exact-id>', type: 'code' },
       { id: 'details', title: 'Details', content: 'The default output is written outside the project. Inspect the printed path with view_image and do not commit temporary screenshots.', type: 'text' }
+    ]
+  },
+  'shg-device': {
+    badge: 'CLI Commands',
+    title: 'shg device',
+    description: 'Inspect and control a connected Android device through targeted ADB commands.',
+    sections: [
+      { id: 'usage', title: 'Usage', content: 'shg device <command> [options]', type: 'code' },
+      { id: 'commands', title: 'Commands', type: 'list', items: [
+        { title: 'status / wake', description: 'Inspect screen and lock state, wake the device, or enable keep-awake mode.' },
+        { title: 'screenshot / dump-ui', description: 'Capture a temporary PNG or save the UIAutomator hierarchy for inspection.' },
+        { title: 'tap / swipe / text / key', description: 'Send basic input events to the focused Android app.' },
+        { title: 'launch / logs / shell', description: 'Launch the project package, tail targeted logcat, or run an explicit ADB shell command.' }
+      ]},
+      { id: 'examples', title: 'Examples', content: 'shg device wake --keep-awake\nshg device tap 540 1200 --wake\nshg device text "hello world"\nshg device dump-ui --output /tmp/window.xml', type: 'code' },
+      { id: 'sleep', title: 'Sleep and lock behavior', content: 'A sleeping screen can be woken while ADB remains connected. SHG does not bypass secure lock screens, and WiFi ADB may disconnect when Android suspends WiFi.', type: 'text' }
     ]
   },
   'shg-deploy': {

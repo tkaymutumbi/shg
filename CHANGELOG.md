@@ -4,6 +4,16 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.4.5] - 2026-08-23
+
+### Added
+- **Device control**: inspect, wake, screenshot, tap, swipe, type, send key events, launch apps, dump UIAutomator hierarchies, tail targeted logs, and run explicit ADB shell commands with `shg device`
+- **Sleep-aware verification**: reports screen, lock, and wakefulness state and provides actionable guidance when a sleeping or locked screen blocks UI inspection
+
+### Changed
+- **Device targeting**: preserves exact ADB endpoints and makes `shg device screenshot` available outside a Capacitor project; `shg screenshot` remains a compatibility alias
+- **Agent guidance**: documents bundled verification plus device control and secure-lock behavior
+
 ## [2026.4.4] - 2026-08-23
 
 ### Added

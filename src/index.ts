@@ -11,6 +11,7 @@ import { runConfig } from "./commands/config.js";
 import { runCreate } from "./commands/create.js";
 import { runDeploy } from "./commands/deploy.js";
 import { runDev } from "./commands/dev.js";
+import { runDevice } from "./commands/device.js";
 import { runDevices } from "./commands/devices.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runLogs } from "./commands/logs.js";
@@ -38,6 +39,7 @@ const COMMAND_REGISTRY: Record<string, CommandHandler> = {
   create: (ctx, rest) => runCreate(ctx, rest),
   deploy: (ctx) => runDeploy(ctx),
   dev: (ctx) => runDev(ctx),
+  device: (ctx, rest) => runDevice(ctx, rest),
   devices: (ctx) => runDevices(ctx),
   doctor: (ctx) => runDoctor(ctx),
   logs: (ctx) => runLogs(ctx),
@@ -75,6 +77,7 @@ Commands:
   build                   Build APK/AAB (debug/release; use --aab or --both)
   clean                   Clean project build artifacts
   devices                 List devices or connect over WiFi with --wifi
+  device                  Control a connected Android device
   logs                    Tail logcat with Capacitor filter
   plugin                  Add/list/sync Capacitor plugins
   assets                  Generate app icons and splash screens
@@ -97,6 +100,13 @@ Examples:
   shg build --release --aab
   shg clean
   shg devices --json
+  shg device status
+  shg device wake --keep-awake
+  shg device screenshot --device <exact-id>
+  shg device tap 540 1200 --wake
+  shg device text "hello world"
+  shg device key back
+  shg device dump-ui --output /tmp/window.xml
   shg logs --tag Capacitor --level D
   shg plugin add @capacitor/camera
   shg assets
@@ -164,6 +174,12 @@ async function main(): Promise<void> {
   if (parsed.version) {
     console.log(CLI_VERSION);
     process.exit(0);
+  }
+
+  if (parsed.help && parsed.command === "device") {
+    const context = makeContext(parsed.flags);
+    const result = await runDevice(context, ["help"]);
+    process.exit(result.exitCode);
   }
 
   if (parsed.help) {
