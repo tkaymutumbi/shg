@@ -21,7 +21,7 @@ import { runSetup } from "./commands/setup.js";
 import { runUpgrade } from "./commands/upgrade.js";
 import { parseArgs } from "./core/args.js";
 import { loadMergedConfig } from "./core/config.js";
-import { findProjectRoot, findAndroidSdkRoot } from "./core/project.js";
+import { findProjectRoot, findWorkspaceRoot, findAndroidSdkRoot } from "./core/project.js";
 import { CLI_VERSION } from "./core/version.js";
 import { runInteractive } from "./interactive.js";
 import { ensureAgentDoc } from "./core/agent-doc.js";
@@ -112,10 +112,11 @@ Global Flags:
 
 function makeContext(flags: Record<string, string | boolean>): CommandContext {
   const projectRoot = findProjectRoot(process.cwd());
+  const workspaceRoot = projectRoot ?? findWorkspaceRoot(process.cwd());
   const loaded = loadMergedConfig(projectRoot);
 
-  if (projectRoot) {
-    ensureAgentDoc(projectRoot);
+  if (workspaceRoot) {
+    ensureAgentDoc(workspaceRoot);
   }
 
   return {

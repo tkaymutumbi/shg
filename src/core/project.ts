@@ -8,6 +8,20 @@ import type { CommandContext } from "../commands/types.js";
 
 export const CONFIG_FILES = ["capacitor.config.ts", "capacitor.config.js", "capacitor.config.json"];
 
+export function findWorkspaceRoot(startDir: string = process.cwd()): string | undefined {
+  let current = resolve(startDir);
+
+  while (true) {
+    if (existsSync(join(current, "package.json")) || existsSync(join(current, ".git"))) {
+      return current;
+    }
+
+    const parent = dirname(current);
+    if (parent === current) return undefined;
+    current = parent;
+  }
+}
+
 export function findProjectRoot(startDir: string = process.cwd()): string | undefined {
   let current = resolve(startDir);
 
