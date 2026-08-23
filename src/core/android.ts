@@ -115,26 +115,57 @@ export function isMatchingAdbEndpoint(deviceId: string, endpoint: string): boole
   return deviceId.trim().toLowerCase() === endpoint.trim().toLowerCase();
 }
 
-async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Promise<boolean> {
+function isWirelessAdbId(deviceId: string): boolean {
+  return deviceId.includes(":") || /_adb-tls-(?:connect|pairing)\._tcp$/i.test(deviceId);
+}
+
+export function selectConnectedWifiEndpoint(
+  devices: AndroidDevice[],
+  preferredEndpoint?: string,
+): string | undefined {
+  const readyWireless = devices.filter((device) => device.status === "device" && isWirelessAdbId(device.id));
+  if (readyWireless.length === 0) return undefined;
+
+  if (preferredEndpoint) {
+    const preferred = preferredEndpoint.trim().toLowerCase();
+    const preferredNormalized = normalizeAdbEndpoint(preferredEndpoint)?.toLowerCase();
+    const exact = readyWireless.find((device) => {
+      const id = device.id.trim().toLowerCase();
+      return id === preferred || (preferredNormalized && normalizeAdbEndpoint(device.id)?.toLowerCase() === preferredNormalized);
+    });
+    if (exact) return exact.id;
+  }
+
+  // Android can expose the same phone twice: once as its exact IP:port and
+  // once through an mDNS `_adb-tls-connect._tcp` alias. Prefer the endpoint
+  // that can be passed directly to adb/native-run.
+  return readyWireless.find((device) => Boolean(normalizeAdbEndpoint(device.id)))?.id ?? readyWireless[0].id;
+}
+
+async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Promise<string | undefined> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const devices = await listAndroidDevices();
-    if (devices.some((device) => device.status === "device" && isMatchingAdbEndpoint(device.id, endpoint))) return true;
+    const connected = devices.find((device) => device.status === "device" && isMatchingAdbEndpoint(device.id, endpoint));
+    if (connected) return connected.id;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  return false;
+  return undefined;
 }
 
-async function connectEndpoint(endpoint: string): Promise<boolean> {
+async function connectEndpoint(endpoint: string): Promise<string | undefined> {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const result = await runCommand(
       { label: "adb connect", cmd: "adb", args: ["connect", endpoint], timeout: 15_000 },
       { stdio: "pipe" },
     );
-    if (adbConnectSucceeded(result) && await waitForConnectedEndpoint(endpoint)) return true;
+    if (adbConnectSucceeded(result)) {
+      const connectedEndpoint = await waitForConnectedEndpoint(endpoint);
+      if (connectedEndpoint) return connectedEndpoint;
+    }
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
-  return false;
+  return undefined;
 }
 
 export async function ensureAdb(): Promise<boolean> {
@@ -306,32 +337,53 @@ function saveWifiIp(ip: string): void {
   writeJsonFile(getWifiStatePath(), { lastIp: ip });
 }
 
-export async function connectOverWifi(): Promise<boolean> {
+export async function connectOverWifi(preferredEndpoint?: string): Promise<string | undefined> {
   console.log(chalk.cyan("\nSetting up WiFi debugging...\n"));
 
   const devices = await listAndroidDevices();
-  const usbDevices = devices.filter((d) => d.status === "device" && !d.id.includes(":"));
-  const wirelessDevices = devices.filter((d) => d.status === "device" && d.id.includes(":"));
+  const usbDevices = devices.filter((d) => d.status === "device" && !isWirelessAdbId(d.id));
+  const savedEndpoint = normalizeAdbEndpoint(loadWifiIp() ?? "");
+  const requestedEndpoint = preferredEndpoint?.trim() || savedEndpoint;
+  const currentEndpoint = selectConnectedWifiEndpoint(devices, requestedEndpoint);
 
-  if (wirelessDevices.length > 0) {
-    console.log(chalk.green(`  Already connected wirelessly: ${wirelessDevices[0].id}`));
-    return true;
+  if (currentEndpoint && (!requestedEndpoint || isMatchingAdbEndpoint(currentEndpoint, requestedEndpoint))) {
+    saveWifiIp(currentEndpoint);
+    console.log(chalk.green(`  Already connected wirelessly: ${currentEndpoint}`));
+    return currentEndpoint;
+  }
+
+  if (preferredEndpoint && requestedEndpoint) {
+    console.log(chalk.dim(`  Reconnecting to requested device: ${requestedEndpoint}`));
+    const reconnectedEndpoint = await connectEndpoint(requestedEndpoint);
+    if (reconnectedEndpoint) {
+      saveWifiIp(reconnectedEndpoint);
+      console.log(chalk.green(`  Reconnected to ${reconnectedEndpoint} over WiFi\n`));
+      return reconnectedEndpoint;
+    }
+    console.error(chalk.red(`  Could not reconnect to ${requestedEndpoint}.`));
+    return undefined;
   }
 
   if (usbDevices.length === 0) {
-    const savedIp = loadWifiIp();
-    const savedEndpoint = savedIp ? normalizeAdbEndpoint(savedIp) : undefined;
-
     if (savedEndpoint) {
       console.log(chalk.dim(`  Trying saved device: ${savedEndpoint}`));
-      if (await connectEndpoint(savedEndpoint)) {
-        console.log(chalk.green(`  Reconnected to ${savedEndpoint} over WiFi\n`));
-        return true;
+      const reconnectedEndpoint = await connectEndpoint(savedEndpoint);
+      if (reconnectedEndpoint) {
+        saveWifiIp(reconnectedEndpoint);
+        console.log(chalk.green(`  Reconnected to ${reconnectedEndpoint} over WiFi\n`));
+        return reconnectedEndpoint;
       }
       console.log(chalk.yellow(`  Could not reconnect to ${savedEndpoint}`));
     }
 
-    if (!savedIp) {
+    const fallbackEndpoint = selectConnectedWifiEndpoint(devices);
+    if (fallbackEndpoint) {
+      saveWifiIp(fallbackEndpoint);
+      console.log(chalk.green(`  Using existing wireless connection: ${fallbackEndpoint}\n`));
+      return fallbackEndpoint;
+    }
+
+    if (!savedEndpoint) {
       console.log(chalk.dim("  No saved WiFi device found. Enter your device IP to continue."));
       console.log(chalk.dim("  It will be saved for next time."));
     }
@@ -344,16 +396,17 @@ export async function connectOverWifi(): Promise<boolean> {
 
     if (typeof ip !== "string") {
       console.log(chalk.yellow("  Cancelled."));
-      return false;
+      return undefined;
     }
 
     const endpoint = normalizeAdbEndpoint(ip);
-    if (!endpoint) return false;
+    if (!endpoint) return undefined;
 
-    if (await connectEndpoint(endpoint)) {
-      saveWifiIp(endpoint);
-      console.log(chalk.green(`  Connected to ${endpoint} over WiFi\n`));
-      return true;
+    const pairedEndpoint = await connectEndpoint(endpoint);
+    if (pairedEndpoint) {
+      saveWifiIp(pairedEndpoint);
+      console.log(chalk.green(`  Connected to ${pairedEndpoint} over WiFi\n`));
+      return pairedEndpoint;
     }
 
     const shouldPair = await p.confirm({
@@ -362,7 +415,7 @@ export async function connectOverWifi(): Promise<boolean> {
     });
     if (typeof shouldPair !== "boolean" || !shouldPair) {
       console.error(chalk.red(`  Could not connect to ${endpoint}.`));
-      return false;
+      return undefined;
     }
 
     const pairAddress = await p.text({
@@ -370,15 +423,15 @@ export async function connectOverWifi(): Promise<boolean> {
       placeholder: "192.168.1.22:37123",
       validate: (val?: string) => normalizeAdbEndpoint(val ?? "", 0) ? undefined : "Enter a valid host:port",
     });
-    if (typeof pairAddress !== "string") return false;
+    if (typeof pairAddress !== "string") return undefined;
     const pairingEndpoint = normalizeAdbEndpoint(pairAddress, 0);
-    if (!pairingEndpoint || !pairAddress.includes(":")) return false;
+    if (!pairingEndpoint || !pairAddress.includes(":")) return undefined;
 
     const pairingCode = await p.text({
       message: "Six-digit pairing code:",
       validate: (val?: string) => /^\d{6}$/.test(val?.trim() ?? "") ? undefined : "Enter the six-digit pairing code",
     });
-    if (typeof pairingCode !== "string") return false;
+    if (typeof pairingCode !== "string") return undefined;
 
     const pairResult = await runCommand(
       { label: "adb pair", cmd: "adb", args: ["pair", pairingEndpoint, pairingCode.trim()] },
@@ -387,14 +440,15 @@ export async function connectOverWifi(): Promise<boolean> {
     const pairOutput = `${pairResult.stdout}\n${pairResult.stderr}`;
     if (!pairResult.success || !/successfully paired/i.test(pairOutput)) {
       console.error(chalk.red("  Wireless debugging pairing failed."));
-      return false;
+      return undefined;
     }
 
     console.log(chalk.green("  Device paired. Connecting to the Wireless debugging address..."));
-    if (await connectEndpoint(endpoint)) {
-      saveWifiIp(endpoint);
-      console.log(chalk.green(`  Connected to ${endpoint} over WiFi\n`));
-      return true;
+    const connectedEndpoint = await connectEndpoint(endpoint);
+    if (connectedEndpoint) {
+      saveWifiIp(connectedEndpoint);
+      console.log(chalk.green(`  Connected to ${connectedEndpoint} over WiFi\n`));
+      return connectedEndpoint;
     }
 
     console.error(chalk.red("  Connection failed. Make sure:"));  
@@ -402,7 +456,7 @@ export async function connectOverWifi(): Promise<boolean> {
     console.log(chalk.yellow("  2. USB Debugging is enabled"));
     console.log(chalk.yellow("  3. Device has been authorized (USB connect once if first time)"));
     console.log(chalk.yellow(`  4. Wireless debugging address is correct (${endpoint})`));
-    return false;
+    return undefined;
   }
 
   const deviceId = usbDevices[0].id;
@@ -412,7 +466,7 @@ export async function connectOverWifi(): Promise<boolean> {
   if (!ip) {
     console.error(chalk.red("  Could not determine device IP."));
     console.log(chalk.yellow("  Make sure WiFi is enabled on the device."));
-    return false;
+    return undefined;
   }
 
   console.log(chalk.dim(`  Device IP: ${ip}`));
@@ -424,20 +478,21 @@ export async function connectOverWifi(): Promise<boolean> {
 
   if (!tcpipResult.success) {
     console.error(chalk.red("  Failed to restart adbd in TCP mode."));
-    return false;
+    return undefined;
   }
 
   console.log(chalk.dim("  Restarted adbd in TCP mode on port 5555"));
 
   const endpoint = `${ip}:5555`;
-  if (!await connectEndpoint(endpoint)) {
+  const connectedEndpoint = await connectEndpoint(endpoint);
+  if (!connectedEndpoint) {
     console.error(chalk.red(`  Failed to connect to ${ip}:5555`));
-    return false;
+    return undefined;
   }
 
-  saveWifiIp(endpoint);
-  console.log(chalk.green(`  Connected to ${ip}:5555 over WiFi\n`));
-  return true;
+  saveWifiIp(connectedEndpoint);
+  console.log(chalk.green(`  Connected to ${connectedEndpoint} over WiFi\n`));
+  return connectedEndpoint;
 }
 
 function isUsableLanIp(value: string): boolean {

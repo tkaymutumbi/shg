@@ -111,6 +111,7 @@ const NAVIGATION: Record<string, NavigationGroup[]> = {
         { id: 'shg-doctor', label: 'shg doctor' },
         { id: 'shg-setup', label: 'shg setup' },
         { id: 'shg-assets', label: 'shg assets' },
+        { id: 'shg-screenshot', label: 'shg screenshot' },
       ]
     },
     {
@@ -169,8 +170,9 @@ const DOC_CONTENT: Record<string, DocPage> = {
       { id: 'overview', title: 'Overview', content: 'SHG (Simplified Hybrid Gateway) is a powerful CLI tool designed to eliminate the friction in Capacitor-based Android development. It brings interactive menus, intelligent diagnostics, and seamless wireless debugging to your fingertips.', type: 'text' },
       { id: 'core-features', title: 'Core Features', type: 'list', items: [
         { title: 'Interactive TUI', description: 'No flags to remember. Just run shg and follow the guided menu.' },
-        { title: 'Live Reload', description: 'Start a dev server and launch your Android app together with one command.' },
-        { title: 'WiFi Debugging', description: 'Deploy and hot-reload wirelessly. Auto-detects your device IP.' },
+        { title: 'Bundled Verification', description: 'Build and launch a self-contained debug APK with shg build and shg run.' },
+        { title: 'Optional Live Reload', description: 'Use shg dev --wifi for focused UI work with exact ADB targeting and diagnostics.' },
+        { title: 'Screenshot QA', description: 'Capture a temporary device PNG with shg screenshot for visual inspection.' },
         { title: 'Auto-Fixing Doctor', description: 'Intelligent diagnostics for Node, Java, ADB, and Android SDK.' }
       ]}
     ]
@@ -192,20 +194,30 @@ const DOC_CONTENT: Record<string, DocPage> = {
     sections: [
       { id: 'doctor-code', title: '1. Run Diagnostics', content: 'shg doctor --fix', type: 'code' },
       { id: 'setup-code', title: '2. Setup Project', content: 'shg setup --install --add-android', type: 'code' },
-      { id: 'dev-code', title: '3. Start Developing', content: 'shg dev', type: 'code' }
+      { id: 'build-code', title: '3. Build and Launch', content: 'shg build\nshg run\nshg screenshot', type: 'code' },
+      { id: 'dev-code', title: 'Optional Live Reload', content: 'shg dev --wifi --host <LAN-IP> --port 5173', type: 'code' }
     ]
   },
   'shg-dev': {
     badge: 'CLI Commands',
     title: 'shg dev',
-    description: 'Start development with live reload on your Android device.',
+    description: 'Optional Vite live reload on your Android device; use shg build and shg run for normal verification.',
     sections: [
       { id: 'usage', title: 'Usage', content: 'shg dev [options]', type: 'code' },
       { id: 'options', title: 'Options', type: 'list', items: [
-        { title: '--wifi', description: 'Connect to the device over WiFi automatically.' },
+        { title: '--wifi', description: 'Connect to the device over WiFi and pass the exact ADB endpoint to Capacitor.' },
         { title: '--host <host>', description: 'Specify the dev server host.' },
         { title: '--port <port>', description: 'Specify the dev server port (default: 5173).' }
       ]}
+    ]
+  },
+  'shg-screenshot': {
+    badge: 'CLI Commands',
+    title: 'shg screenshot',
+    description: 'Capture a temporary PNG from a ready Android device.',
+    sections: [
+      { id: 'usage', title: 'Usage', content: 'shg screenshot\nshg screenshot --device <exact-id>', type: 'code' },
+      { id: 'details', title: 'Details', content: 'The default output is written outside the project. Inspect the printed path with view_image and do not commit temporary screenshots.', type: 'text' }
     ]
   },
   'shg-deploy': {

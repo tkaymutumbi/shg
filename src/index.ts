@@ -18,6 +18,7 @@ import { runOpen } from "./commands/open.js";
 import { runPlugin } from "./commands/plugin.js";
 import { runRun } from "./commands/run.js";
 import { runSetup } from "./commands/setup.js";
+import { runScreenshot } from "./commands/screenshot.js";
 import { runUpgrade } from "./commands/upgrade.js";
 import { parseArgs } from "./core/args.js";
 import { loadMergedConfig } from "./core/config.js";
@@ -43,6 +44,7 @@ const COMMAND_REGISTRY: Record<string, CommandHandler> = {
   open: (ctx) => runOpen(ctx),
   plugin: (ctx, rest) => runPlugin(ctx, rest),
   run: (ctx) => runRun(ctx),
+  screenshot: (ctx) => runScreenshot(ctx),
   setup: (ctx) => runSetup(ctx),
   upgrade: (ctx) => runUpgrade(ctx),
 };
@@ -65,7 +67,7 @@ Usage:
   shg <command> [flags]
 
 Commands:
-  dev                     Live reload dev server + Android app
+  dev                     Optional Vite live reload + Android app
   doctor                  Run environment and project diagnostics
   deploy                  Build/sync/run flows
   setup                   Setup capacitor dependencies and platform
@@ -76,6 +78,7 @@ Commands:
   logs                    Tail logcat with Capacitor filter
   plugin                  Add/list/sync Capacitor plugins
   assets                  Generate app icons and splash screens
+  screenshot              Capture a temporary Android screenshot
   open                    Open project in Android Studio
   create                  Scaffold a new app (React, Vue, Angular, etc.)
   bump                    Bump versionName/versionCode
@@ -83,8 +86,9 @@ Commands:
   config                  Read or update SHG config
 
 Examples:
-  shg dev --host 0.0.0.0 --port 5173
-  shg dev --wifi                       Wireless live reload
+  shg build
+  shg run
+  shg dev --wifi --host <LAN-IP>       Optional wireless live reload
   shg doctor --fix
   shg deploy --all --device emulator-5554 --variant debug
   shg setup --install --add-android
@@ -96,6 +100,7 @@ Examples:
   shg logs --tag Capacitor --level D
   shg plugin add @capacitor/camera
   shg assets
+  shg screenshot
   shg open
   shg create my-app                    Scaffold new app interactively
   shg bump --to 2026.4.0

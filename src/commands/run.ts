@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import chalk from "chalk";
 import { runCommand } from "../core/executor.js";
-import { listAndroidDevices, connectOverWifi, loadWifiIp } from "../core/android.js";
+import { listAndroidDevices, connectOverWifi, loadWifiIp, selectConnectedWifiEndpoint } from "../core/android.js";
 import { requireProjectRoot, readAppId } from "../core/project.js";
 import { loadState, saveState } from "../core/state.js";
 import type { CommandContext, CommandResult } from "./types.js";
@@ -147,8 +147,9 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
       if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
 
       if (shouldReconnect) {
-        const ok = await connectOverWifi();
-        if (ok) {
+        const connectedEndpoint = await connectOverWifi(resolvedTarget);
+        if (connectedEndpoint) {
+          resolvedTarget = connectedEndpoint;
           devices = await listAndroidDevices();
           readyDevices = devices.filter((d) => d.status === "device");
         }
@@ -172,8 +173,9 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
     if (p.isCancel(shouldReconnect)) return { exitCode: 130 };
 
     if (shouldReconnect) {
-      const ok = await connectOverWifi();
-      if (ok) {
+      const connectedEndpoint = await connectOverWifi();
+      if (connectedEndpoint) {
+        resolvedTarget = connectedEndpoint;
         devices = await listAndroidDevices();
         readyDevices = devices.filter((d) => d.status === "device");
       }
@@ -193,6 +195,12 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
   if (!resolvedTarget && readyDevices.length === 1) {
     resolvedTarget = readyDevices[0].id;
+  }
+  if (!resolvedTarget) {
+    // A phone may appear once as its exact IP:port and once as an mDNS alias.
+    // Use the exact endpoint so Capacitor/native-run does not prompt or pick
+    // the duplicate arbitrarily.
+    resolvedTarget = selectConnectedWifiEndpoint(readyDevices);
   }
 
   if (!options.skipSync && context.config.autoSyncBeforeRun) {
@@ -243,12 +251,12 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
 
       if (deviceGone) {
         log(chalk.yellow("\nWiFi connection dropped during deploy. Reconnecting...\n"));
-        const reconnected = await connectOverWifi();
-        if (reconnected) {
+        const reconnectedTarget = await connectOverWifi(wifiTarget);
+        if (reconnectedTarget) {
           log(chalk.dim("App was already installed. Re-launching...\n"));
-          if (await launchInstalledApp(projectRoot, wifiTarget)) {
+          if (await launchInstalledApp(projectRoot, reconnectedTarget)) {
             log(chalk.green("App re-launched successfully after reconnection.\n"));
-            saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
+            saveState(projectRoot, { lastDeviceId: reconnectedTarget, lastVariant: variant, lastFlavor: flavor });
             return { exitCode: 0 };
           }
 
@@ -263,16 +271,16 @@ export async function runRun(context: CommandContext, options: RunOptions = {}):
             {
               label: "adb install -r",
               cmd: "adb",
-              args: ["-s", wifiTarget, "install", "-r", "-d", apkPath],
+              args: ["-s", reconnectedTarget, "install", "-r", "-d", apkPath],
               cwd: projectRoot,
             },
             { stdio: "inherit" },
           );
 
           if (reinstallResult.success) {
-            if (await launchInstalledApp(projectRoot, wifiTarget)) {
+            if (await launchInstalledApp(projectRoot, reconnectedTarget)) {
               log(chalk.green("App re-installed and launched successfully.\n"));
-              saveState(projectRoot, { lastDeviceId: wifiTarget, lastVariant: variant, lastFlavor: flavor });
+              saveState(projectRoot, { lastDeviceId: reconnectedTarget, lastVariant: variant, lastFlavor: flavor });
               return { exitCode: 0 };
             }
             error(chalk.red("App was re-installed, but its launcher activity could not be started."));

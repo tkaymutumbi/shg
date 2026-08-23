@@ -66,7 +66,7 @@ const { runUpgrade } = await import("../upgrade.js");
 const { runDoctor } = await import("../doctor.js");
 const { runConfig } = await import("../config.js");
 const { runBump } = await import("../bump.js");
-const { runDev } = await import("../dev.js");
+const { runDev, buildLiveReloadArgs } = await import("../dev.js");
 const { runPlugin } = await import("../plugin.js");
 const { runRun } = await import("../run.js");
 const { runDeploy } = await import("../deploy.js");
@@ -109,6 +109,17 @@ describe("runDevices", () => {
   });
 });
 
+describe("live reload targeting", () => {
+  test("passes the exact WiFi endpoint to Capacitor", () => {
+    expect(buildLiveReloadArgs("192.168.1.179", "44893", "192.168.1.179:44893")).toEqual([
+      "cap", "run", "android", "--live-reload",
+      "--host", "192.168.1.179",
+      "--port", "44893",
+      "--target", "192.168.1.179:44893",
+    ]);
+  });
+});
+
 describe("runLogs", () => {
   test("starts logcat with default filter", async () => {
     const result = await runLogs(makeContext());
@@ -135,8 +146,13 @@ describe("runOpen", () => {
 
 describe("runAssets", () => {
   test("generates assets", async () => {
-    const result = await runAssets(makeContext());
+    const project = mkdtempSync(join(tmpdir(), "shg-assets-"));
+    mkdirSync(join(project, "public"));
+    writeFileSync(join(project, "public", "icon.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\"><rect width=\"1\" height=\"1\"/></svg>");
+    const result = await runAssets(makeContext({ projectRoot: project }));
     expect(result.exitCode).toBe(0);
+    expect(execaCalls.some(({ cmd, args }) => cmd === "bunx" && args[0] === "@capacitor/assets")).toBe(true);
+    rmSync(project, { recursive: true, force: true });
   });
 });
 

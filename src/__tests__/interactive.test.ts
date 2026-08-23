@@ -1,5 +1,5 @@
 import { describe, expect, test, mock } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -85,9 +85,13 @@ describe("runInteractive", () => {
   });
 
   test("assets category", async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), "shg-assets-test-"));
+    mkdirSync(join(tmpDir, "public"));
+    writeFileSync(join(tmpDir, "public", "icon.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\"><rect width=\"1\" height=\"1\"/></svg>");
     mockSelectValues = ["assets"];
-    const code = await runInteractive(makeContext());
+    const code = await runInteractive(makeContext({ projectRoot: tmpDir }));
     expect(code).toBe(0);
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 
   test("open category", async () => {

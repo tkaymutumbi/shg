@@ -26,15 +26,15 @@
 
 ---
 
-SHG streamlines every Capacitor Android workflow — from project setup and live-reload development to building signed APKs and bumping versions — so you spend less time on CLI incantations and more time building your app.
+SHG streamlines every Capacitor Android workflow — from project setup and bundled debug verification to optional live-reload development, signed APKs, and version bumps — so you spend less time on CLI incantations and more time building your app.
 
 The project also includes a [documentation website](web/) (React + Vite) with full docs, command reference, and a searchable interface.
 
 ## Features
 
 - **Interactive TUI** — Launch `shg` with no arguments to get a menu-driven interface
-- **Live Reload** — Start a dev server and Android app together with `shg dev`
-- **WiFi Debugging** — Run `shg dev --wifi` to deploy and hot-reload wirelessly
+- **Bundled Verification** — Build and launch a self-contained debug app with `shg build && shg run`
+- **Optional Live Reload** — Start a Vite server and Android app together with `shg dev`; use `shg dev --wifi` for focused wireless UI work
 - **Interactive Dev Prompting** — Pick Auto, WiFi, or USB/Emulator from the interactive dev flow
 - **Auto-Install adb** — Downloads platform-tools automatically if adb is missing
 - **Smart Deploy** — Build → sync → run in one command with failure safety
@@ -44,7 +44,7 @@ The project also includes a [documentation website](web/) (React + Vite) with fu
 - **Diagnostics** — Check Node, Java, adb, Android SDK, Gradle, Capacitor deps, and Java target mismatches
 - **Device Management** — List ADB devices with model info
 - **Logcat Viewer** — Tail filtered Android logs with `shg logs`
-- **Asset Generation** — Generate icons and splash screens via capacitor-assets
+- **Asset Generation** — Validate project icon sources and generate Android icons/splash screens via `@capacitor/assets`
 - **Version Bumping** — Bump `versionName`/`versionCode` in JSON config and Android Gradle files
 - **Upgrade Helper** — Check and upgrade Capacitor packages
 - **Clean Builds** — Remove build artifacts with one command
@@ -86,8 +86,9 @@ shg
 # Or jump straight to a command
 shg doctor --fix
 shg setup --install --add-android
-shg dev --host 0.0.0.0              # Live reload over USB
-shg dev --wifi                       # Live reload over WiFi
+shg build                            # Bundled debug APK
+shg run                              # Install and launch it
+shg dev --wifi --host <LAN-IP>       # Optional live reload
 shg deploy --all --device emulator-5554
 ```
 
@@ -114,19 +115,19 @@ Running `shg` with no arguments opens the interactive TUI:
 └─────────────────────────────────────────────┘
 ```
 
-Each selection walks you through the necessary prompts — no flags to remember. The Dev flow now lets you choose Auto, WiFi, or USB/Emulator mode and set the port/host interactively.
+Each selection walks you through the necessary prompts — no flags to remember. Use Build & Deploy for the normal bundled verification path; the Dev flow is optional live reload and lets you choose WiFi or USB/Emulator mode and set the port/host interactively.
 
 ## Command Reference
 
 ### `shg dev`
 
-Start a live-reload dev server and launch the Android app. Auto-installs `adb` if missing, auto-builds web assets if the output directory is empty, and detects the Android SDK even when `ANDROID_SDK_ROOT` isn't set.
+Start an optional Vite live-reload server and launch the Android app. Auto-installs `adb` if missing, auto-builds web assets if the output directory is empty, checks the selected host/port and Capacitor config, and detects the Android SDK even when `ANDROID_SDK_ROOT` isn't set. For normal testing use `shg build` followed by `shg run`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--host` | `localhost`/auto | Dev server host |
 | `--port` | `5173` | Dev server port |
-| `--wifi` | — | Connect to device over WiFi instead of USB |
+| `--wifi` | — | Connect to device over WiFi for optional live reload |
 | `--skip-build` | — | Skip auto-build if web assets directory is missing |
 
 **First connection (USB required):**
@@ -150,7 +151,17 @@ The device IP is auto-detected for USB-authorized devices. If no device is found
 shg dev --host 0.0.0.0 --port 5173
 ```
 
-> Once running, the app hot-reloads on every file save — no need to re-run the command.
+> Once running, the app hot-reloads on every file save — no need to re-run the command. WiFi mode passes the exact connected ADB `IP:port` to Capacitor with `--target`; if the screen is blank, follow SHG's printed `adb`, logcat, and screenshot diagnostics.
+
+### `shg screenshot`
+
+Capture a temporary PNG from the selected Android device for visual inspection. The default output is outside the project; inspect the printed path with `view_image` and do not commit it.
+
+```bash
+shg screenshot
+shg screenshot --device 192.168.1.179:44893
+shg screenshot --output /tmp/battery-screen.png
+```
 
 ### `shg doctor`
 
@@ -294,7 +305,7 @@ shg plugin sync
 
 ### `shg assets`
 
-Generate app icons and splash screens via `capacitor-assets`.
+Validate an icon source and generate Android app icons and splash screens via `@capacitor/assets`. SHG accepts `assets/icon.(svg|png|jpg)` or copies a valid `public/icon.(svg|png|jpg)` into `assets/`.
 
 ```bash
 shg assets

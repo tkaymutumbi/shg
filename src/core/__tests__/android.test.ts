@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { adbConnectSucceeded, isMatchingAdbEndpoint, normalizeAdbEndpoint, parseAdbDevices } from "../android.js";
+import { adbConnectSucceeded, isMatchingAdbEndpoint, normalizeAdbEndpoint, parseAdbDevices, selectConnectedWifiEndpoint } from "../android.js";
 
 describe("parseAdbDevices", () => {
   test("parses device list with model info", () => {
@@ -85,5 +85,24 @@ describe("isMatchingAdbEndpoint", () => {
     expect(isMatchingAdbEndpoint("192.168.1.22:5555", "192.168.1.22:5555")).toBe(true);
     expect(isMatchingAdbEndpoint("192.168.1.23:5555", "192.168.1.22:5555")).toBe(false);
     expect(isMatchingAdbEndpoint("192.168.1.22:5555", "192.168.1.22:5556")).toBe(false);
+  });
+});
+
+describe("selectConnectedWifiEndpoint", () => {
+  test("prefers the exact IP endpoint when Android also exposes an mDNS alias", () => {
+    const devices = parseAdbDevices(`List of devices attached
+adb-123._adb-tls-connect._tcp\tdevice\tmodel:Phone
+192.168.1.179:44893\tdevice\tmodel:Phone
+`);
+
+    expect(selectConnectedWifiEndpoint(devices)).toBe("192.168.1.179:44893");
+  });
+
+  test("preserves the requested endpoint during reconnect selection", () => {
+    const devices = parseAdbDevices(`List of devices attached
+192.168.1.179:44893\tdevice\n192.168.1.180:5555\tdevice\n`);
+
+    expect(selectConnectedWifiEndpoint(devices, "192.168.1.180:5555")).toBe("192.168.1.180:5555");
+    expect(selectConnectedWifiEndpoint(devices, "192.168.1.181:5555")).toBe("192.168.1.179:44893");
   });
 });

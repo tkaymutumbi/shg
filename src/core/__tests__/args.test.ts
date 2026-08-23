@@ -24,6 +24,14 @@ describe("parseArgs", () => {
     expect(result.rest).toEqual(["add", "@capacitor/camera"]);
   });
 
+  test("screenshot command accepts an output path", () => {
+    const result = parseArgs(["screenshot", "--device", "192.168.1.179:44893", "--output", "/tmp/screen.png"]);
+    expect(result.command).toBe("screenshot");
+    expect(result.flags.device).toBe("192.168.1.179:44893");
+    expect(result.flags.output).toBe("/tmp/screen.png");
+    expect(result.errors).toEqual([]);
+  });
+
   test("unknown command produces error", () => {
     const result = parseArgs(["foobar"]);
     expect(result.errors).toContain("Unknown command: foobar");

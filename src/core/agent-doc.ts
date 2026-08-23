@@ -15,7 +15,7 @@ const AGENTS_MD = `# SHG CLI — Agent Playbook
 
 **Version:** ${CLI_VERSION}
 
-Use this guide whenever the user asks to use SHG in this project. SHG streamlines Capacitor Android setup, diagnostics, device connections, live reload, builds, deployment, logs, assets, and version management.
+Use this guide whenever the user asks to use SHG in this project. SHG streamlines Capacitor Android setup, diagnostics, device connections, bundled builds, optional live reload, deployment, logs, assets, and version management.
 
 ## How to help the user
 
@@ -26,18 +26,20 @@ Use this guide whenever the user asks to use SHG in this project. SHG streamline
    - \`bunx cap init "<app name>" <reverse.domain.appid> --web-dir <build-directory>\`
    - \`bun add @capacitor/android\`
    - \`bunx cap add android\`
-4. Prefer \`shg dev --wifi\` for Wi-Fi live reload and \`shg dev\` for USB/emulators.
-5. Use \`shg devices --wifi\` to connect or pair a phone. For Android 11+, guide the user to Developer options → Wireless debugging; the pairing address and connection address can use different ports.
-6. Use \`shg build\` for a debug APK, \`shg build --release\` for a release APK, and \`shg build --release --aab\` for a Play Store bundle.
-7. Preserve the user's source files and existing project instructions. Ask before changing signing credentials, app IDs, or release configuration.
-8. If the user asks for an interactive workflow, run plain \`shg\` in a real TTY and help them choose the appropriate menu item.
+4. For normal Android testing, use the bundled workflow: \`shg build\` followed by \`shg run\`. Use \`shg build --release\` for a release APK and \`shg build --release --aab\` for a Play Store bundle.
+5. Treat \`shg dev --wifi\` as optional live reload for focused UI work or troubleshooting, not the default verification path. It must use the exact connected ADB endpoint and a device-reachable LAN host.
+6. Use \`shg devices --wifi\` to connect or pair a phone. For Android 11+, guide the user to Developer options → Wireless debugging; the pairing address and connection address can use different ports.
+7. After launching Android, run \`shg screenshot\` to capture a temporary device PNG and inspect the printed path with \`view_image\`. If the screen is blank or shows an error, collect filtered logcat with \`shg logs --tag Capacitor --level E\`. Use \`shg screenshot --device <exact-id>\` when more than one device is connected. Do not commit temporary screenshots unless explicitly requested.
+8. For bundled builds, verify the embedded Capacitor config contains no \`server.url\`, laptop IP, or Vite dependency. If live reload fails, report the host, port, ADB target, logcat command, and screenshot path, then stop with actionable diagnostics rather than silently switching workflows.
+9. Preserve the user's source files and existing project instructions. Ask before changing signing credentials, app IDs, or release configuration.
+10. If the user asks for an interactive workflow, run plain \`shg\` in a real TTY and help them choose the appropriate menu item.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | \`shg\` | Launch interactive mode (default) |
-| \`shg dev\` | Start live reload dev server + Android app |
+| \`shg dev\` | Optional Vite live reload + Android app |
 | \`shg doctor\` | Run environment and project diagnostics |
 | \`shg deploy\` | Build/sync/run flows |
 | \`shg setup\` | Setup Capacitor dependencies and Android platform |
@@ -48,6 +50,7 @@ Use this guide whenever the user asks to use SHG in this project. SHG streamline
 | \`shg logs\` | Tail logcat with Capacitor filter |
 | \`shg plugin\` | Add/list/sync Capacitor plugins |
 | \`shg assets\` | Generate app icons and splash screens |
+| \`shg screenshot\` | Capture a temporary Android screenshot |
 | \`shg open\` | Open project in Android Studio |
 | \`shg bump\` | Bump versionName/versionCode |
 | \`shg upgrade\` | Check/upgrade Capacitor packages |
@@ -73,9 +76,12 @@ SHG reads config from (in order):
 ## Typical Workflows
 
 \`\`\`bash
-# Live reload development
-shg dev --host 0.0.0.0 --port 5173
-shg dev --wifi                   # Wireless live reload
+# Default bundled debug verification
+shg build
+shg run
+
+# Optional live reload troubleshooting/UI work
+shg dev --wifi --host <LAN-IP> --port 5173
 
 # Full deploy pipeline
 shg deploy --all --device emulator-5554 --variant debug
@@ -89,6 +95,10 @@ shg doctor --fix
 # Build release APK or AAB
 shg build --release
 shg build --release --aab
+
+# Temporary Android screenshot and filtered errors
+shg screenshot
+shg logs --tag Capacitor --level E
 
 # View logs
 shg logs --tag Capacitor --level D

@@ -23,7 +23,7 @@ export function isCancelled<T>(val: T | symbol): val is symbol {
 }
 
 const CATEGORIES = [
-  { value: "dev", label: "Dev Server (Live Reload)", hint: "start dev server + android app" },
+  { value: "dev", label: "Dev Server (Optional Live Reload)", hint: "start Vite + android app" },
   { value: "devices", label: "Connect / List Devices", hint: "USB and WiFi ADB setup" },
   { value: "deploy", label: "Build & Deploy", hint: "smart deploy pipeline" },
   { value: "setup", label: "Capacitor Setup", hint: "install/init/update/add android" },
@@ -52,7 +52,7 @@ export async function runInteractive(context: CommandContext): Promise<number> {
       message: "How do you want to run dev?",
       options: [
         { value: "auto", label: "Auto", hint: "Use current defaults and prompt later if needed" },
-        { value: "wifi", label: "WiFi", hint: "Connect wirelessly and use live reload over LAN" },
+        { value: "wifi", label: "WiFi", hint: "Optional live reload over LAN" },
         { value: "usb", label: "USB / Emulator", hint: "Use a connected device or running emulator" },
       ],
     });
