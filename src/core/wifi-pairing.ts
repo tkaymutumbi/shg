@@ -2,7 +2,7 @@ import {
   AdbMdnsService,
   connectAdbEndpoint,
   pairAdbEndpoint,
-  selectMdnsConnectService,
+  selectMdnsConnectServices,
   waitForAdbMdnsService,
   listAdbMdnsServices,
 } from "./android.js";
@@ -63,24 +63,32 @@ export async function pairWithQr(
 
   status("Waiting for the phone's secure ADB service...");
   const startedAt = Date.now();
+  let sawConnectService = false;
+  let lastConnectService: AdbMdnsService | undefined;
+  const attemptedEndpoints = new Set<string>();
   while (Date.now() - startedAt < timeoutMs) {
     if (options.signal?.aborted) return { success: false, pairingService, failure: "cancelled" };
-    const connectService = selectMdnsConnectService(
+    const connectServices = selectMdnsConnectServices(
       await listAdbMdnsServices(),
       pairingService.endpoint,
     );
-    if (connectService) {
+    if (connectServices.length > 0) sawConnectService = true;
+    for (const connectService of connectServices) {
+      if (attemptedEndpoints.has(connectService.endpoint)) continue;
+      attemptedEndpoints.add(connectService.endpoint);
+      lastConnectService = connectService;
       status(`Connecting to ${connectService.endpoint}...`);
       const deviceId = await connectAdbEndpoint(connectService.endpoint);
       if (deviceId) {
         return { success: true, pairingService, connectService, deviceId };
       }
-      return { success: false, pairingService, connectService, failure: "connect-failed" };
     }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
 
-  return { success: false, pairingService, failure: "connect-timeout" };
+  return sawConnectService
+    ? { success: false, pairingService, connectService: lastConnectService, failure: "connect-failed" }
+    : { success: false, pairingService, failure: "connect-timeout" };
 }
 
 export function qrPairingFailureMessage(failure: QrPairingFailure): string {

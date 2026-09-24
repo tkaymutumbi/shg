@@ -114,6 +114,18 @@ export function selectMdnsConnectService(
   return connectServices.length === 1 ? connectServices[0] : undefined;
 }
 
+/** Return every secure ADB endpoint advertised by the device that just paired. */
+export function selectMdnsConnectServices(
+  services: AdbMdnsService[],
+  pairingEndpoint: string,
+): AdbMdnsService[] {
+  const pairingHost = getEndpointHost(pairingEndpoint);
+  return services.filter((service) => (
+    service.serviceType === "_adb-tls-connect._tcp"
+    && getEndpointHost(service.endpoint) === pairingHost
+  ));
+}
+
 export async function listAdbMdnsServices(): Promise<AdbMdnsService[]> {
   const result = await runCommand(
     { label: "adb mdns services", cmd: "adb", args: ["mdns", "services"], timeout: 10_000 },
