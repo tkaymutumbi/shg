@@ -2,6 +2,7 @@ import {
   AdbMdnsService,
   connectAdbEndpoint,
   pairAdbEndpoint,
+  listAndroidDevices,
   selectMdnsConnectServices,
   waitForAdbMdnsService,
   listAdbMdnsServices,
@@ -73,6 +74,23 @@ export async function pairWithQr(
       pairingService.endpoint,
     );
     if (connectServices.length > 0) sawConnectService = true;
+
+    // adb may auto-connect through its own mDNS watcher while SHG is retrying
+    // a stale endpoint. Recognize the device by the mDNS service alias and
+    // return the matching current endpoint instead of reporting a false
+    // failure after pairing has already succeeded.
+    const devices = await listAndroidDevices();
+    for (const connectService of connectServices) {
+      const serviceName = `${connectService.instanceName}._adb-tls-connect._tcp`.toLowerCase();
+      const device = devices.find((candidate) => candidate.status === "device" && (
+        candidate.id.toLowerCase() === connectService.endpoint.toLowerCase()
+        || candidate.id.toLowerCase() === serviceName
+      ));
+      if (device) {
+        return { success: true, pairingService, connectService, deviceId: device.id };
+      }
+    }
+
     for (const connectService of connectServices) {
       if (attemptedEndpoints.has(connectService.endpoint)) continue;
       attemptedEndpoints.add(connectService.endpoint);

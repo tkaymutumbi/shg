@@ -4,6 +4,11 @@ All notable changes to `shg-cli` will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows Semantic Versioning.
 
+## [2026.4.6] - 2026-09-25
+
+### Fixed
+- **QR Wi-Fi pairing**: recognizes when ADB auto-connects after the phone refreshes its mDNS connection port, avoiding a false pairing failure on stale endpoints
+
 ## [2026.4.5] - 2026-08-23
 
 ### Added
