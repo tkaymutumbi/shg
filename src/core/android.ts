@@ -51,7 +51,12 @@ export function parseAdbDevices(output: string): AndroidDevice[] {
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("List of devices attached"))
     .map((line) => {
-      const [id, status, ...rest] = line.split(/\s+/);
+      // Wireless ids from adb mDNS can contain spaces ("adb-XXXX-abc (3)._adb-tls-connect._tcp"),
+      // so find the state token instead of splitting on the first whitespace.
+      const stateMatch = line.match(/^(.+?)\s+(device|offline|unauthorized|connecting|authorizing|recovery|sideload|bootloader|no permissions)\b(.*)$/);
+      const [id, status, ...rest] = stateMatch
+        ? [stateMatch[1].trim(), stateMatch[2], ...stateMatch[3].trim().split(/\s+/).filter(Boolean)]
+        : line.split(/\s+/);
       const modelToken = rest.find((token) => token.startsWith("model:"));
       return {
         id,

@@ -2,6 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { adbConnectSucceeded, isMatchingAdbEndpoint, normalizeAdbEndpoint, parseAdbDevices, selectConnectedWifiEndpoint, selectReadyAndroidTarget } from "../android.js";
 
 describe("parseAdbDevices", () => {
+  test("parses mDNS wireless ids that contain spaces", () => {
+    const output = "List of devices attached\nadb-ABC-xyz (3)._adb-tls-connect._tcp device product:p model:TECNO_KL4 transport_id:1\n";
+    expect(parseAdbDevices(output)).toEqual([
+      { id: "adb-ABC-xyz (3)._adb-tls-connect._tcp", status: "device", model: "TECNO_KL4" },
+    ]);
+  });
+
   test("parses device list with model info", () => {
     const output = `List of devices attached
 emulator-5554\tdevice\tproduct:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a
