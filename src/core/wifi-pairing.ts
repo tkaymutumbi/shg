@@ -3,6 +3,7 @@ import {
   connectAdbEndpoint,
   pairAdbEndpoint,
   listAndroidDevices,
+  isWirelessAdbId,
   selectMdnsConnectServices,
   waitForAdbMdnsService,
   listAdbMdnsServices,
@@ -40,7 +41,7 @@ export async function pairWithQr(
   options: QrPairingOptions = {},
 ): Promise<QrPairingResult> {
   const timeoutMs = options.timeoutMs ?? 45_000;
-  const pollIntervalMs = options.pollIntervalMs ?? 750;
+  const pollIntervalMs = options.pollIntervalMs ?? 300;
   const status = options.onStatus ?? (() => {});
 
   if (options.signal?.aborted) return { success: false, failure: "cancelled" };
@@ -57,6 +58,9 @@ export async function pairWithQr(
     return { success: false, failure: options.signal?.aborted ? "cancelled" : "pairing-timeout" };
   }
 
+  // Devices already connected before pairing must not be mistaken for the new phone.
+  const knownIds = new Set((await listAndroidDevices()).map((d) => d.id));
+
   status(`Pairing with ${pairingService.endpoint}...`);
   if (!await pairAdbEndpoint(pairingService.endpoint, credentials.secret)) {
     return { success: false, pairingService, failure: "pairing-rejected" };
@@ -67,19 +71,26 @@ export async function pairWithQr(
   let sawConnectService = false;
   let lastConnectService: AdbMdnsService | undefined;
   const attemptedEndpoints = new Set<string>();
+  const knownWirelessIds = knownIds;
   while (Date.now() - startedAt < timeoutMs) {
     if (options.signal?.aborted) return { success: false, pairingService, failure: "cancelled" };
-    const connectServices = selectMdnsConnectServices(
-      await listAdbMdnsServices(),
-      pairingService.endpoint,
-    );
+    // Query mDNS and adb devices concurrently; each is a separate adb process.
+    const [services, devices] = await Promise.all([listAdbMdnsServices(), listAndroidDevices()]);
+    const connectServices = selectMdnsConnectServices(services, pairingService.endpoint);
     if (connectServices.length > 0) sawConnectService = true;
 
-    // adb may auto-connect through its own mDNS watcher while SHG is retrying
-    // a stale endpoint. Recognize the device by the mDNS service alias and
-    // return the matching current endpoint instead of reporting a false
-    // failure after pairing has already succeeded.
-    const devices = await listAndroidDevices();
+    // adb often auto-connects right after pairing via its own mDNS watcher,
+    // even when `adb mdns services` never lists the connect service. Accept a
+    // ready wireless device on the pairing host (or the only ready wireless
+    // device) without waiting for mDNS discovery.
+    const pairingHost = pairingService.endpoint.replace(/:\d+$/, "").toLowerCase();
+    const readyWireless = devices.filter((d) => d.status === "device" && isWirelessAdbId(d.id));
+    const autoConnected = readyWireless.find((d) => d.id.toLowerCase().startsWith(`${pairingHost}:`))
+      ?? (readyWireless.length === 1 && !knownWirelessIds.has(readyWireless[0].id) ? readyWireless[0] : undefined);
+    if (autoConnected) {
+      return { success: true, pairingService, deviceId: autoConnected.id };
+    }
+
     for (const connectService of connectServices) {
       const serviceName = `${connectService.instanceName}._adb-tls-connect._tcp`.toLowerCase();
       const device = devices.find((candidate) => candidate.status === "device" && (

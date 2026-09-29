@@ -307,7 +307,7 @@ async function waitForConnectedEndpoint(endpoint: string, timeoutMs = 6000): Pro
     // it is safe to return that alias; multiple devices remain ambiguous.
     const wireless = devices.filter((device) => device.status === "device" && isWirelessAdbId(device.id));
     if (wireless.length === 1) return wireless[0].id;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
   return undefined;
 }
@@ -322,7 +322,7 @@ export async function connectAdbEndpoint(endpoint: string): Promise<string | und
       const connected = await waitForConnectedEndpoint(endpoint);
       if (connected) return connected;
     }
-    await new Promise((resolve) => setTimeout(resolve, 750));
+    await new Promise((resolve) => setTimeout(resolve, 300));
   }
   return undefined;
 }
